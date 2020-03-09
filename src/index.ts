@@ -248,11 +248,12 @@ export async function runInContext(
   } else {
     let it = evaluate(program, context)
     let scheduler: Scheduler
-    if (theOptions.scheduler === 'async') {
-      scheduler = new AsyncScheduler()
-    } else if (theOptions.scheduler === 'non-det') {
+    // theOptions.scheduler = 'non-det'
+    if (theOptions.scheduler === 'non-det') {
       it = nonDetEvaluate(program, context)
       scheduler = new NonDetScheduler()
+    } else if (theOptions.scheduler === 'async') {
+      scheduler = new AsyncScheduler()
     } else {
       scheduler = new PreemptiveScheduler(theOptions.steps)
     }
