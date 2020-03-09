@@ -12,7 +12,7 @@ import {
 import { RuntimeSourceError } from './errors/runtimeSourceError'
 import { evaluate } from './interpreter/interpreter'
 import { parse, parseAt } from './parser/parser'
-import { AsyncScheduler, PreemptiveScheduler } from './schedulers'
+import { AsyncScheduler, PreemptiveScheduler, NonDetScheduler } from './schedulers'
 import { areBreakpointsSet, setBreakpointAtLine } from './stdlib/inspector'
 import { codify, getEvaluationSteps } from './stepper/stepper'
 import { sandboxedEval } from './transpiler/evalContainer'
@@ -26,11 +26,12 @@ import {
   Scheduler,
   SourceError
 } from './types'
+import { nonDetEvaluate } from './interpreter/non-det-interpreter'
 import { locationDummyNode } from './utils/astCreator'
 import { validateAndAnnotate } from './validator/validator'
 
 export interface IOptions {
-  scheduler: 'preemptive' | 'async'
+  scheduler: 'preemptive' | 'async' | 'non-det'
   steps: number
   executionMethod: ExecutionMethod
   originalMaxExecTime: number
@@ -245,10 +246,13 @@ export async function runInContext(
       )
     }
   } else {
-    const it = evaluate(program, context)
+    let it = evaluate(program, context)
     let scheduler: Scheduler
     if (theOptions.scheduler === 'async') {
       scheduler = new AsyncScheduler()
+    } else if (theOptions.scheduler === 'non-det') {
+      it = nonDetEvaluate(program, context)
+      scheduler = new NonDetScheduler()
     } else {
       scheduler = new PreemptiveScheduler(theOptions.steps)
     }
