@@ -196,7 +196,7 @@ function* getArgs(context: Context, call: es.CallExpression) {
 
 function* getAmbArgs(context: Context, call: es.CallExpression) {
   for (const arg of call.arguments) {
-    yield* evaluate(arg, context);
+    yield* evaluate(arg, context)
   }
 }
 
@@ -226,19 +226,26 @@ export type Evaluator<T extends es.Node> = (node: T, context: Context) => Iterab
 
 function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
   hoistFunctionsAndVariableDeclarationsIdentifiers(context, node)
-  let result
-  for (const statement of node.body) {
-    result = yield* evaluate(statement, context)
-    if (
-      result instanceof ReturnValue ||
-      result instanceof TailCallReturnValue ||
-      result instanceof BreakValue ||
-      result instanceof ContinueValue
-    ) {
-      break
+  yield* evaluateSequence(context, node.body)
+}
+
+function* evaluateSequence(context: Context, sequence: es.Statement[]): IterableIterator<Value> {
+  if (sequence.length === 0) {
+    return yield undefined // repl does not work unless we handle this case --> Why?
+  }
+
+  if (sequence.length === 1) {
+    const sequenceValGenerator = evaluate(sequence[0], context)
+    yield* sequenceValGenerator
+  } else {
+    const sequenceValGenerator = evaluate(sequence[0], context)
+    sequence.shift()
+    let sequenceValue = sequenceValGenerator.next()
+    while(!sequenceValue.done) {
+      yield* evaluateSequence(context, sequence)
+      sequenceValue = sequenceValGenerator.next()
     }
   }
-  return result
 }
 
 /**
