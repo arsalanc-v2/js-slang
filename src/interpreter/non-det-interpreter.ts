@@ -123,18 +123,6 @@ function defineVariable(context: Context, name: string, value: Value, constant =
   return environment
 }
 
-function* visit(context: Context, node: es.Node) {
-  checkEditorBreakpoints(context, node)
-  context.runtime.nodes.unshift(node)
-  yield context
-}
-
-function* leave(context: Context) {
-  context.runtime.break = false
-  context.runtime.nodes.shift()
-  yield context
-}
-
 const currentEnvironment = (context: Context) => context.runtime.environments[0]
 const replaceEnvironment = (context: Context, environment: Environment) =>
   (context.runtime.environments[0] = environment)
@@ -576,9 +564,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
-  yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)
-  yield* leave(context)
   return result
 }
 
