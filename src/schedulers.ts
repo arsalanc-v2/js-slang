@@ -35,6 +35,23 @@ export class AsyncScheduler implements Scheduler {
   }
 }
 
+export class NonDetScheduler implements Scheduler {
+  public run(it: IterableIterator<Value>, context: Context): Promise<Result> {
+    return new Promise((resolve, reject) => {
+      let itValue = it.next()
+      while (!itValue.done) {
+        console.log(itValue.value)
+        itValue = it.next()
+      }
+      resolve({
+        status: 'finished',
+        context,
+        value: itValue.value
+      })
+    })
+  }
+}
+
 export class PreemptiveScheduler implements Scheduler {
   constructor(public steps: number) {}
 
