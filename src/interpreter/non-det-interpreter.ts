@@ -194,6 +194,12 @@ function* getArgs(context: Context, call: es.CallExpression) {
   return args
 }
 
+function* getAmbArgs(context: Context, call: es.CallExpression) {
+  for (const arg of call.arguments) {
+    yield* evaluate(arg, context);
+  }
+}
+
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
@@ -283,6 +289,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   CallExpression: function*(node: es.CallExpression, context: Context) {
+    const callee = node.callee as es.Identifier;
+    if (callee.name === 'amb') {
+      yield* getAmbArgs(context, node)
+    }
+    /*
     const callee = yield* evaluate(node.callee, context)
     const args = yield* getArgs(context, node)
     let thisContext
@@ -290,7 +301,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       thisContext = yield* evaluate(node.callee.object, context)
     }
     const result = yield* apply(context, callee, args, node, thisContext)
-    return result
+    return result */
   },
 
   NewExpression: function*(node: es.NewExpression, context: Context) {
