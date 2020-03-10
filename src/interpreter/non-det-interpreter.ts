@@ -213,6 +213,20 @@ function* getAmbArgs(context: Context, call: es.CallExpression) {
   }
 }
 
+function* evaluateRequire(context: Context, call: es.CallExpression) {
+  // TODO: Throw an error if require has 0 arguments
+  const predicate = call.arguments[0]
+  const predicateGenerator = evaluate(predicate, context)
+  let predicateValue = predicateGenerator.next()
+
+  while (!predicateValue.done) {
+    if (predicateValue.value) {
+      yield 'Satisfied require'
+    }
+    predicateValue = predicateGenerator.next()
+  }
+}
+
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
@@ -315,6 +329,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const callee = node.callee as es.Identifier;
     if (callee.name === 'amb') {
       yield* getAmbArgs(context, node)
+    }
+
+    if (callee.name === 'require') {
+      yield* evaluateRequire(context, node)
     }
     /*
     const callee = yield* evaluate(node.callee, context)
