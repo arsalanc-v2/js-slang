@@ -307,7 +307,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Identifier: function*(node: es.Identifier, context: Context) {
-    return getVariable(context, node.name)
+    yield getVariable(context, node.name)
+    return
   },
 
   CallExpression: function*(node: es.CallExpression, context: Context) {
