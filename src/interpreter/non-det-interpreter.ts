@@ -508,9 +508,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     const id = node.left as es.Identifier
     // Make sure it exist
-    const value = yield* evaluate(node.right, context)
-    setVariable(context, id.name, value)
-    return value
+    const valueGenerator = evaluate(node.right, context)
+    let value = valueGenerator.next();
+    while(!value.done) {
+        const oldValue = getVariable(context, id.name)
+        setVariable(context, id.name, value.value)
+        yield "Assigned value " + value.value + " to variable " + id.name
+        // undo assignment
+        setVariable(context, id.name, oldValue)
+        value = valueGenerator.next()
+    }
   },
 
   FunctionDeclaration: function*(node: es.FunctionDeclaration, context: Context) {
