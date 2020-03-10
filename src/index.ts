@@ -1,5 +1,4 @@
-import { simple } from 'acorn-walk/dist/walk'
-import { DebuggerStatement, Literal, Program } from 'estree'
+import { Literal, Program } from 'estree'
 import { RawSourceMap, SourceMapConsumer } from 'source-map'
 import { JSSLANG_PROPERTIES, UNKNOWN_LOCATION } from './constants'
 import createContext from './createContext'
@@ -13,7 +12,7 @@ import { RuntimeSourceError } from './errors/runtimeSourceError'
 import { evaluate } from './interpreter/interpreter'
 import { parse, parseAt } from './parser/parser'
 import { AsyncScheduler, PreemptiveScheduler, NonDetScheduler } from './schedulers'
-import { areBreakpointsSet, setBreakpointAtLine } from './stdlib/inspector'
+import { setBreakpointAtLine } from './stdlib/inspector'
 import { codify, getEvaluationSteps } from './stepper/stepper'
 import { sandboxedEval } from './transpiler/evalContainer'
 import { transpile } from './transpiler/transpiler'
@@ -24,7 +23,8 @@ import {
   Finished,
   Result,
   Scheduler,
-  SourceError
+  SourceError,
+  Suspended
 } from './types'
 import { nonDetEvaluate } from './interpreter/non-det-interpreter'
 import { locationDummyNode } from './utils/astCreator'
@@ -119,33 +119,6 @@ function convertNativeErrorToSourceError(
 
 let previousCode = ''
 
-function determineExecutionMethod(theOptions: IOptions, context: Context, program: Program) {
-  let isNativeRunnable
-  if (theOptions.executionMethod === 'auto') {
-    if (context.executionMethod === 'auto') {
-      if (verboseErrors) {
-        isNativeRunnable = false
-      } else if (areBreakpointsSet()) {
-        isNativeRunnable = false
-      } else {
-        let hasDeuggerStatement = false
-        simple(program, {
-          DebuggerStatement(node: DebuggerStatement) {
-            hasDeuggerStatement = true
-          }
-        })
-        isNativeRunnable = !hasDeuggerStatement
-      }
-      context.executionMethod = isNativeRunnable ? 'native' : 'interpreter'
-    } else {
-      isNativeRunnable = context.executionMethod === 'native'
-    }
-  } else {
-    isNativeRunnable = theOptions.executionMethod === 'native'
-  }
-  return isNativeRunnable
-}
-
 export async function runInContext(
   code: string,
   context: Context,
@@ -179,7 +152,7 @@ export async function runInContext(
       value: steps.map(codify)
     } as Result)
   }
-  const isNativeRunnable = determineExecutionMethod(theOptions, context, program)
+  const isNativeRunnable = false
   if (context.prelude !== null) {
     const prelude = context.prelude
     context.prelude = null
@@ -248,7 +221,7 @@ export async function runInContext(
   } else {
     let it = evaluate(program, context)
     let scheduler: Scheduler
-    // theOptions.scheduler = 'non-det'
+    theOptions.scheduler = 'non-det'
     if (theOptions.scheduler === 'non-det') {
       it = nonDetEvaluate(program, context)
       scheduler = new NonDetScheduler()
@@ -257,6 +230,7 @@ export async function runInContext(
     } else {
       scheduler = new PreemptiveScheduler(theOptions.steps)
     }
+
     return scheduler.run(it, context)
   }
 }
@@ -267,6 +241,10 @@ export function resume(result: Result): Finished | ResultError | Promise<Result>
   } else {
     return result.scheduler.run(result.it, result.context)
   }
+}
+
+export function resumeNonDet(result: Suspended): Promise<Result> {
+  return result.scheduler.run(result.it, result.context)
 }
 
 export function interrupt(context: Context) {

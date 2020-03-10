@@ -315,7 +315,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const callee = node.callee as es.Identifier;
     if (callee.name === 'amb') {
       yield* getAmbArgs(context, node)
+    } else if (callee.name === 'try_again') {
+      yield "try_again";
     }
+
     /*
     const callee = yield* evaluate(node.callee, context)
     const args = yield* getArgs(context, node)

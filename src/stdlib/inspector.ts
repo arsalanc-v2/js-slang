@@ -21,7 +21,8 @@ export const manualToggleDebugger = (context: Context): Result => {
     status: 'suspended',
     scheduler: context.debugger.state.scheduler,
     it: context.debugger.state.it,
-    context
+    context,
+    value: undefined
   }
 }
 

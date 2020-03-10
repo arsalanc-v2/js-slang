@@ -26,7 +26,8 @@ export class AsyncScheduler implements Scheduler {
           status: 'suspended',
           it,
           scheduler: this,
-          context
+          context,
+          value: null
         })
       } else {
         resolve({ status: 'finished', context, value: itValue.value })
@@ -38,16 +39,24 @@ export class AsyncScheduler implements Scheduler {
 export class NonDetScheduler implements Scheduler {
   public run(it: IterableIterator<Value>, context: Context): Promise<Result> {
     return new Promise((resolve, reject) => {
-      let itValue = it.next()
-      while (!itValue.done) {
-        console.log(itValue.value)
-        itValue = it.next()
+      const itValue = it.next()
+      try {
+        if (itValue.done) {
+          resolve({ status: 'finished', context, value: itValue.value })
+        } else {
+          resolve({
+            status: 'suspended',
+            it,
+            scheduler: this,
+            context,
+            value: itValue.value
+          })
+        }
+      } catch (e) {
+        resolve({ status: 'error' })
+      } finally {
+        context.runtime.isRunning = false
       }
-      resolve({
-        status: 'finished',
-        context,
-        value: itValue.value
-      })
     })
   }
 }
@@ -103,7 +112,8 @@ export class PreemptiveScheduler implements Scheduler {
               status: 'suspended',
               it,
               scheduler: this,
-              context
+              context,
+              value: null
             })
           } else {
             resolve({ status: 'finished', context, value: itValue.value })

@@ -138,6 +138,7 @@ export interface Suspended {
   it: IterableIterator<Value>
   scheduler: Scheduler
   context: Context
+  value: Value
 }
 
 export type Result = Suspended | Finished | Error
