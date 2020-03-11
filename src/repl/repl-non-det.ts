@@ -8,16 +8,28 @@ import { TRY_AGAIN } from '../constants'
 // stores the result obtained when execution is suspended
 let previousResult: SuspendedNonDet
 
+function _handleResult(
+  result: any,
+  context: Context,
+  callback: (err: Error | null, result: any) => void
+) {
+  if (result.status === 'error') {
+    callback(new Error(parseError(context.errors)), undefined)
+    return
+  }
+
+  if (result.value === TRY_AGAIN) {
+    _try_again(result, context, callback)
+    return
+  }
+
+  previousResult = result
+  callback(null, result.value)
+}
+
 function _resume(context: Context, callback: (err: Error | null, result: any) => void) {
   resume(previousResult).then(result => {
-    if (result.status === 'error') {
-      callback(new Error(parseError(context.errors)), undefined)
-      return
-    } else if (result.status === 'suspended') {
-      previousResult = result
-    }
-
-    callback(null, result.value)
+    _handleResult(result, context, callback)
   })
 }
 
@@ -34,32 +46,18 @@ function _try_again(
   }
 }
 
-function run(
+function _run(
   cmd: string,
   context: Context,
   options: Partial<IOptions>,
   callback: (err: Error | null, result: any) => void
 ) {
   runInContext(cmd, context, options).then(result => {
-    if (result.status === 'error') {
-      callback(new Error(parseError(context.errors)), undefined)
-      return
-    }
-
-    if (result.status === 'suspended' && result.value) {
-      if (result.value === TRY_AGAIN) {
-        _try_again(result, context, callback)
-        return
-      }
-
-      previousResult = result
-    }
-
-    callback(null, result.value)
+    _handleResult(result, context, callback)
   })
 }
 
-function startRepl(chapter = 1, useSubst: boolean, prelude = '') {
+function _startRepl(chapter = 1, useSubst: boolean, prelude = '') {
   // use defaults for everything
   const context = createContext(chapter)
   const options: Partial<IOptions> = { scheduler: 'preemptive', useSubst }
@@ -74,7 +72,7 @@ function startRepl(chapter = 1, useSubst: boolean, prelude = '') {
       // the object being passed as argument fits the interface ReplOptions in the repl module.
       {
         eval: (cmd, unusedContext, unusedFilename, callback) => {
-          run(cmd, context, options, callback)
+          _run(cmd, context, options, callback)
         },
         // set depth to a large number so that `parse()` output will not be folded,
         // setting to null also solves the problem, however a reference loop might crash
@@ -95,12 +93,12 @@ function main() {
       if (err) {
         throw err
       }
-      startRepl(4, false, data)
+      _startRepl(4, false, data)
     })
   } else {
     const chapter = process.argv.length > 2 ? parseInt(firstArg, 10) : 1
     const useSubst = process.argv.length > 3 ? process.argv[3] === 'subst' : false
-    startRepl(chapter, useSubst)
+    _startRepl(chapter, useSubst)
   }
 }
 
