@@ -2,7 +2,6 @@ import { Literal, Program } from 'estree'
 import { SourceMapConsumer } from 'source-map'
 import createContext from './createContext'
 import { InterruptedError } from './errors/errors'
-import { evaluate } from './interpreter/interpreter-non-det'
 import { parse, parseAt } from './parser/parser'
 import { NonDetScheduler } from './schedulers'
 import { setBreakpointAtLine } from './stdlib/inspector'
@@ -95,10 +94,9 @@ export async function runInContext(
     return runInContext(code, context, options)
   }
 
-  let it = evaluate(program, context)
   let scheduler: NonDetScheduler
   // theOptions.scheduler = 'non-det'
-  it = nonDetEvaluate(program, context)
+  let it = nonDetEvaluate(program, context)
   scheduler = new NonDetScheduler()
   return scheduler.run(it, context)
 }
