@@ -1,7 +1,7 @@
 /* tslint:disable:max-classes-per-file */
 import { MaximumStackLimitExceeded } from './errors/errors'
 import { saveState } from './stdlib/inspector'
-import { Context, Result, Scheduler, Value } from './types'
+import { Context, Result, ResultNonDet, Scheduler, Value } from './types'
 
 export class AsyncScheduler implements Scheduler {
   public run(it: IterableIterator<Value>, context: Context): Promise<Result> {
@@ -26,8 +26,7 @@ export class AsyncScheduler implements Scheduler {
           status: 'suspended',
           it,
           scheduler: this,
-          context,
-          value: null
+          context
         })
       } else {
         resolve({ status: 'finished', context, value: itValue.value })
@@ -37,7 +36,7 @@ export class AsyncScheduler implements Scheduler {
 }
 
 export class NonDetScheduler implements Scheduler {
-  public run(it: IterableIterator<Value>, context: Context): Promise<Result> {
+  public run(it: IterableIterator<Value>, context: Context): Promise<ResultNonDet> {
     return new Promise((resolve, reject) => {
       const itValue = it.next()
       try {
@@ -112,8 +111,7 @@ export class PreemptiveScheduler implements Scheduler {
               status: 'suspended',
               it,
               scheduler: this,
-              context,
-              value: null
+              context
             })
           } else {
             resolve({ status: 'finished', context, value: itValue.value })

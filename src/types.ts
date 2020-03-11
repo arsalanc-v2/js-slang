@@ -138,10 +138,14 @@ export interface Suspended {
   it: IterableIterator<Value>
   scheduler: Scheduler
   context: Context
+}
+
+export interface SuspendedNonDet extends Suspended {
   value: Value
 }
 
 export type Result = Suspended | Finished | Error
+export type ResultNonDet = SuspendedNonDet | Finished | Error
 
 export interface Scheduler {
   run(it: IterableIterator<Value>, context: Context): Promise<Result>

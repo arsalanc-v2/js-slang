@@ -8,6 +8,7 @@ import { conditionalExpression, literal, primitive } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
+import { TRY_AGAIN } from '../constants'
 
 class BreakValue {}
 
@@ -316,7 +317,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (callee.name === 'amb') {
       yield* getAmbArgs(context, node)
     } else if (callee.name === 'try_again') {
-      yield "try_again";
+      yield TRY_AGAIN;
     }
 
     /*
