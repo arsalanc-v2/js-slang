@@ -96,7 +96,7 @@ export async function runInContext(
 
   let scheduler: NonDetScheduler
   // theOptions.scheduler = 'non-det'
-  let it = nonDetEvaluate(program, context)
+  const it = nonDetEvaluate(program, context)
   scheduler = new NonDetScheduler()
   return scheduler.run(it, context)
 }
