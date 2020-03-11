@@ -9,6 +9,7 @@ import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/oper
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 import { TRY_AGAIN } from '../constants'
+import { cloneDeep, assignIn } from 'lodash'
 
 class BreakValue {}
 
@@ -209,8 +210,10 @@ function* getArgs(context: Context, call: es.CallExpression) {
 }
 
 function* getAmbArgs(context: Context, call: es.CallExpression) {
+  const originalContext = cloneDeep(context)
   for (const arg of call.arguments) {
     yield* evaluate(arg, context)
+    assignIn(context, cloneDeep(originalContext)) // reset context
   }
 }
 
