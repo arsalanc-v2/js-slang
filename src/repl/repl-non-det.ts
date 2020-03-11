@@ -27,8 +27,12 @@ function _handleResult(
   callback(null, result.value)
 }
 
-function _resume(context: Context, callback: (err: Error | null, result: any) => void) {
-  resume(previousResult).then(result => {
+function _resume(
+  toResume: SuspendedNonDet,
+  context: Context,
+  callback: (err: Error | null, result: any) => void
+) {
+  resume(toResume).then(result => {
     _handleResult(result, context, callback)
   })
 }
@@ -39,7 +43,7 @@ function _try_again(
   callback: (err: Error | null, result: any) => void
 ) {
   if (previousResult && previousResult.status === 'suspended') {
-    _resume(context, callback)
+    _resume(previousResult, context, callback)
   } else {
     result.value = undefined
     callback(null, result.value)
