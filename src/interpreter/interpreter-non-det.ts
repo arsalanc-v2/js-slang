@@ -311,7 +311,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Identifier: function*(node: es.Identifier, context: Context) {
-    yield getVariable(context, node.name)
+    if (node.name === 'try_again') {
+      yield TRY_AGAIN;
+    } else {
+      yield getVariable(context, node.name)
+    }
     return
   },
 
@@ -319,8 +323,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const callee = node.callee as es.Identifier;
     if (callee.name === 'amb') {
       yield* getAmbArgs(context, node)
-    } else if (callee.name === 'try_again') {
-      yield TRY_AGAIN;
     }
 
     /*
