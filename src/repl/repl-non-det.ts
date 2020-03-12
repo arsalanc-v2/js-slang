@@ -13,6 +13,8 @@ function _handleResult(
 ) {
   if (result.status === 'finished' || result.status === 'suspended-non-det') {
     previousResult = result
+
+    if (result.value === CUT) result.value = undefined
     callback(null, result.value)
   } else {
     callback(new Error(parseError(context.errors)), undefined)
