@@ -11,13 +11,13 @@ function _handleResult(
   context: Context,
   callback: (err: Error | null, result: any) => void
 ) {
-  if (result.status === 'error' || result.status === 'suspended') {
+  if (result.status === 'finished' || result.status === 'suspended-non-det') {
+    previousResult = result
+    callback(null, result.value)
+  } else {
     callback(new Error(parseError(context.errors)), undefined)
     return
   }
-
-  previousResult = result
-  callback(null, result.value)
 }
 
 function _resume(
