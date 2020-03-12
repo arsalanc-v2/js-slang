@@ -1,25 +1,18 @@
 import fs = require('fs')
 import repl = require('repl') // 'repl' here refers to the module named 'repl' in index.d.ts
 import util = require('util')
-import { createContext, IOptions, parseError, runInContext, resume } from '../index-non-det'
-import { SuspendedNonDet, Context, Finished } from '../types'
-import { TRY_AGAIN } from '../constants'
+import { createContext, IOptions, parseError, runInContext, resume, Result } from '../index'
+import { SuspendedNonDet, Context } from '../types'
 
 // stores the result obtained when execution is suspended
-let previousResult: SuspendedNonDet
-
+let previousResult: Result
 function _handleResult(
-  result: any,
+  result: Result,
   context: Context,
   callback: (err: Error | null, result: any) => void
 ) {
-  if (result.status === 'error') {
+  if (result.status === 'error' || result.status === 'suspended') {
     callback(new Error(parseError(context.errors)), undefined)
-    return
-  }
-
-  if (result.value === TRY_AGAIN) {
-    _try_again(result, context, callback)
     return
   }
 
@@ -32,21 +25,16 @@ function _resume(
   context: Context,
   callback: (err: Error | null, result: any) => void
 ) {
-  resume(toResume).then(result => {
+  Promise.resolve(resume(toResume)).then((result: Result) => {
     _handleResult(result, context, callback)
   })
 }
 
-function _try_again(
-  result: Finished | SuspendedNonDet,
-  context: Context,
-  callback: (err: Error | null, result: any) => void
-) {
-  if (previousResult && previousResult.status === 'suspended') {
+function _try_again(context: Context, callback: (err: Error | null, result: any) => void) {
+  if (previousResult && previousResult.status === 'suspended-non-det') {
     _resume(previousResult, context, callback)
   } else {
-    result.value = undefined
-    callback(null, result.value)
+    callback(null, undefined)
   }
 }
 
@@ -56,37 +44,42 @@ function _run(
   options: Partial<IOptions>,
   callback: (err: Error | null, result: any) => void
 ) {
-  runInContext(cmd, context, options).then(result => {
-    _handleResult(result, context, callback)
-  })
+  if (cmd.trim() === 'try_again;') {
+    _try_again(context, callback)
+  } else {
+    runInContext(cmd, context, options).then(result => {
+      _handleResult(result, context, callback)
+    })
+  }
 }
 
 function _startRepl(chapter = 1, useSubst: boolean, prelude = '') {
   // use defaults for everything
   const context = createContext(chapter)
   const options: Partial<IOptions> = { scheduler: 'preemptive', useSubst }
-
+  context.executionMethod = 'non-det-interpreter'
   runInContext(prelude, context, options).then(preludeResult => {
-    if (preludeResult.status === 'error') {
+    if (preludeResult.status === 'finished' || preludeResult.status === 'suspended-non-det') {
+      console.dir(preludeResult.value, { depth: null })
+
+      repl.start(
+        // the object being passed as argument fits the interface ReplOptions in the repl module.
+        {
+          eval: (cmd, unusedContext, unusedFilename, callback) => {
+            _run(cmd, context, options, callback)
+          },
+          // set depth to a large number so that `parse()` output will not be folded,
+          // setting to null also solves the problem, however a reference loop might crash
+          writer: output =>
+            util.inspect(output, {
+              depth: 1000,
+              colors: true
+            })
+        }
+      )
+    } else {
       throw new Error(parseError(context.errors))
     }
-
-    console.dir(preludeResult.value, { depth: null })
-    repl.start(
-      // the object being passed as argument fits the interface ReplOptions in the repl module.
-      {
-        eval: (cmd, unusedContext, unusedFilename, callback) => {
-          _run(cmd, context, options, callback)
-        },
-        // set depth to a large number so that `parse()` output will not be folded,
-        // setting to null also solves the problem, however a reference loop might crash
-        writer: output =>
-          util.inspect(output, {
-            depth: 1000,
-            colors: true
-          })
-      }
-    )
   })
 }
 

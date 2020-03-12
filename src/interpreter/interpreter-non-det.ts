@@ -8,7 +8,6 @@ import { conditionalExpression, literal, primitive } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
-import { TRY_AGAIN } from '../constants'
 import { cloneDeep, assignIn } from 'lodash'
 
 class BreakValue {}
@@ -226,7 +225,7 @@ function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalE
 }
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
-  // TODO: Throw an error if require has 0 arguments
+  // TODO: Throw an error if require does not have 0 arguments
   const predicate = call.arguments[0]
   const predicateGenerator = evaluate(predicate, context)
   let predicateValue = predicateGenerator.next()
@@ -325,11 +324,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Identifier: function*(node: es.Identifier, context: Context) {
-    if (node.name === 'try_again') {
-      yield TRY_AGAIN;
-    } else {
-      yield getVariable(context, node.name)
-    }
+    yield getVariable(context, node.name)
     return
   },
 
