@@ -9,6 +9,7 @@ import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/oper
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 import { cloneDeep, assignIn } from 'lodash'
+import { CUT } from '../constants'
 
 class BreakValue {}
 
@@ -263,7 +264,6 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
   if (sequence.length === 0) {
     return yield undefined // repl does not work unless we handle this case --> Why?
   }
-
   const firstStatement = sequence[0]
   if (sequence.length === 1) {
     const sequenceValGenerator = evaluate(firstStatement, context)
@@ -272,11 +272,23 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     const sequenceValGenerator = evaluate(firstStatement, context)
     sequence.shift()
     let sequenceValue = sequenceValGenerator.next()
+
+    // prevent unshifting of cut operator
+    let shouldUnshift = sequenceValue.value !== CUT
+
     while (!sequenceValue.done) {
-      yield* evaluateSequence(context, sequence)
+      const res = yield* evaluateSequence(context, sequence)
+      if (res === CUT) {
+        // prevent unshifting of statenents before cut
+        shouldUnshift = false
+        break
+      }
+
       sequenceValue = sequenceValGenerator.next()
     }
-    sequence.unshift(firstStatement)
+
+    if (shouldUnshift) sequence.unshift(firstStatement)
+    else return CUT
   }
 }
 
@@ -324,6 +336,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Identifier: function*(node: es.Identifier, context: Context) {
+    if (node.name === 'cut') {
+      return yield CUT
+    }
+
     yield getVariable(context, node.name)
     return
   },
