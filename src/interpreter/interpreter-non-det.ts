@@ -367,32 +367,40 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   UnaryExpression: function*(node: es.UnaryExpression, context: Context) {
-    const value = yield* evaluate(node.argument, context)
+    const argGenerator = evaluate(node.argument, context)
+    let argValue = argGenerator.next()
 
-    const error = rttc.checkUnaryExpression(node, node.operator, value)
-    if (error) {
-      return handleRuntimeError(context, error)
+    while (!argValue.done) {
+      const error = rttc.checkUnaryExpression(node, node.operator, argValue.value)
+      if (error) {
+        return handleRuntimeError(context, error)
+      }
+
+      yield evaluateUnaryExpression(node.operator, argValue.value)
+      argValue = argGenerator.next()
     }
-    return evaluateUnaryExpression(node.operator, value)
+    return
   },
 
   BinaryExpression: function*(node: es.BinaryExpression, context: Context) {
-    const left = yield* evaluate(node.left, context)
-    const right = yield* evaluate(node.right, context)
+    const leftGenerator = evaluate(node.left, context)
+    let leftValue = leftGenerator.next();
 
-    const error = rttc.checkBinaryExpression(node, node.operator, left, right)
-    if (error) {
-      return handleRuntimeError(context, error)
+    while (!leftValue.done) {
+      const rightGenerator = evaluate(node.right, context)
+      let rightValue = rightGenerator.next();
+      while (!rightValue.done) {
+        const error = rttc.checkBinaryExpression(node, node.operator, leftValue.value, rightValue.value)
+        if (error) {
+          return handleRuntimeError(context, error)
+        }
+        yield evaluateBinaryExpression(node.operator, leftValue.value, rightValue.value)
+        rightValue = rightGenerator.next();
+      }
+
+      leftValue = leftGenerator.next();
     }
-    return evaluateBinaryExpression(node.operator, left, right)
-  },
-
-  ConditionalExpression: function*(node: es.ConditionalExpression, context: Context) {
-    return yield* this.IfStatement(node, context)
-  },
-
-  LogicalExpression: function*(node: es.LogicalExpression, context: Context) {
-    return yield* this.ConditionalExpression(transformLogicalExpression(node), context)
+    return
   },
 
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
