@@ -265,11 +265,10 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     return yield undefined // repl does not work unless we handle this case --> Why?
   }
   const firstStatement = sequence[0]
+  const sequenceValGenerator = evaluate(firstStatement, context)
   if (sequence.length === 1) {
-    const sequenceValGenerator = evaluate(firstStatement, context)
     yield* sequenceValGenerator
   } else {
-    const sequenceValGenerator = evaluate(firstStatement, context)
     sequence.shift()
     let sequenceValue = sequenceValGenerator.next()
 
