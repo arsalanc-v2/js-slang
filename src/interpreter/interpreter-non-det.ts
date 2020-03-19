@@ -124,19 +124,6 @@ function defineVariable(context: Context, name: string, value: Value, constant =
   return environment
 }
 
-/* Resets a variable binding to be assigned with value HOISTED_BUT_NOT_YET_ASSIGNED
- * Pre-condition: The variable binding should exist in this innermost frame
- */
-function resetVariable(context: Context, name: string, value: Value, constant = false) {
-  const environment = context.runtime.environments[0]
-
-  Object.defineProperty(environment.head, name, {
-    value,
-    writable: !constant,
-    enumerable: true
-  })
-}
-
 const currentEnvironment = (context: Context) => context.runtime.environments[0]
 const replaceEnvironment = (context: Context, environment: Environment) =>
   (context.runtime.environments[0] = environment)
@@ -428,8 +415,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     while(!value.done) {
       defineVariable(context, id.name, value.value, constant)
       yield "Declared variable " + id.name + " with value " + value.value
-      // before entering the "next world", undo the variable declaration
-      resetVariable(context, id.name, HOISTED_BUT_NOT_YET_ASSIGNED, constant)
       value = valueGenerator.next()
     }
     return undefined
