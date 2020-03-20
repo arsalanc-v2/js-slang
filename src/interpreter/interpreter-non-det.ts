@@ -229,15 +229,18 @@ function* evaluateRequire(context: Context, call: es.CallExpression) {
 function* reduceIf(
   node: es.IfStatement | es.ConditionalExpression,
   context: Context
-): IterableIterator<es.Node> {
-  const test = yield* evaluate(node.test, context)
+): IterableIterator<Value> {
+  const testGenerator = evaluate(node.test, context)
+  let test = testGenerator.next()
+  while (!test.done) {
+    const error = rttc.checkIfStatement(node, test.value)
+    if (error) {
+      return handleRuntimeError(context, error)
+    }
+    yield test.value ? node.consequent : node.alternate
 
-  const error = rttc.checkIfStatement(node, test)
-  if (error) {
-    return handleRuntimeError(context, error)
+    test = testGenerator.next()
   }
-
-  return test ? node.consequent : node.alternate
 }
 
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
@@ -405,6 +408,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return
   },
 
+  ConditionalExpression: function*(node: es.ConditionalExpression, context: Context) {
+    return yield* this.IfStatement(node, context)
+  },
+
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
     const declaration = node.declarations[0]
     const constant = node.kind === 'const'
@@ -552,7 +559,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    return yield* evaluate(yield* reduceIf(node, context), context)
+    const branchGenerator = reduceIf(node, context)
+    let branch = branchGenerator.next()
+    while(!branch.done) {
+      yield* evaluate(branch.value, context)
+      branch = branchGenerator.next()
+    }
   },
 
   ExpressionStatement: function*(node: es.ExpressionStatement, context: Context) {
