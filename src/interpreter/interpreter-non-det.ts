@@ -229,7 +229,7 @@ function* evaluateRequire(context: Context, call: es.CallExpression) {
 function* reduceIf(
   node: es.IfStatement | es.ConditionalExpression,
   context: Context
-): IterableIterator<Value> {
+): IterableIterator<es.Node> {
   const testGenerator = evaluate(node.test, context)
   let test = testGenerator.next()
   while (!test.done) {
@@ -237,7 +237,7 @@ function* reduceIf(
     if (error) {
       return handleRuntimeError(context, error)
     }
-    yield test.value ? node.consequent : node.alternate
+    yield test.value ? node.consequent : node.alternate!
 
     test = testGenerator.next()
   }
