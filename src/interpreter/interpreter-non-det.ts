@@ -213,7 +213,13 @@ function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalE
 }
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
-  // TODO: Throw an error if require does not have 0 arguments
+  if (call.arguments.length !== 1) {
+    return yield handleRuntimeError(
+      context,
+      new errors.InvalidNumberOfArguments(call, 1, call.arguments.length)
+    )
+  }
+
   const predicate = call.arguments[0]
   const predicateGenerator = evaluate(predicate, context)
   let predicateValue = predicateGenerator.next()
