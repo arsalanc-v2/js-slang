@@ -187,7 +187,8 @@ const checkNumberOfArguments = (
 }
 
 function* getArgs(context: Context, call: es.CallExpression) {
-  yield* cartesianProduct(context, call.arguments as es.Expression[], [])
+  const args = cloneDeep(call.arguments)
+  return yield* cartesianProduct(context, args as es.Expression[], [])
 }
 
 /* Given a list of non deterministic nodes, this generator returns every
@@ -204,9 +205,9 @@ function* cartesianProduct(
     const nodeValueGenerator = evaluate(currentNode, context)
     let nodeValue = nodeValueGenerator.next()
     while (!nodeValue.done) {
-      nodeValues.unshift(nodeValue.value)
+      nodeValues.push(nodeValue.value)
       yield* cartesianProduct(context, nodes, nodeValues)
-      nodeValues.shift()
+      nodeValues.pop()
       nodeValue = nodeValueGenerator.next()
     }
     nodes.unshift(currentNode)
