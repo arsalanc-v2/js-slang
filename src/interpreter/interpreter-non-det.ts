@@ -4,7 +4,7 @@ import * as constants from '../constants'
 import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
-import { conditionalExpression, literal, primitive } from '../utils/astCreator'
+import { primitive } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
@@ -125,8 +125,6 @@ function defineVariable(context: Context, name: string, value: Value, constant =
 }
 
 const currentEnvironment = (context: Context) => context.runtime.environments[0]
-const replaceEnvironment = (context: Context, environment: Environment) =>
-  (context.runtime.environments[0] = environment)
 const popEnvironment = (context: Context) => context.runtime.environments.shift()
 const pushEnvironment = (context: Context, environment: Environment) =>
   context.runtime.environments.unshift(environment)
@@ -189,11 +187,30 @@ const checkNumberOfArguments = (
 }
 
 function* getArgs(context: Context, call: es.CallExpression) {
-  const args = []
-  for (const arg of call.arguments) {
-    args.push(yield* evaluate(arg, context))
+  yield* cartesianProduct(context, call.arguments as es.Expression[], [])
+}
+
+/* Given a list of non deterministic nodes, this generator returns every
+ * combination of values of these nodes */
+function* cartesianProduct(
+  context: Context,
+  nodes: es.Expression[],
+  nodeValues: Value[]
+): IterableIterator<Value[]> {
+  if (nodes.length === 0) {
+    yield nodeValues
+  } else {
+    const currentNode = nodes.shift()! // we need the postfix ! to tell compiler that nodes array is nonempty
+    const nodeValueGenerator = evaluate(currentNode, context)
+    let nodeValue = nodeValueGenerator.next()
+    while (!nodeValue.done) {
+      nodeValues.unshift(nodeValue.value)
+      yield* cartesianProduct(context, nodes, nodeValues)
+      nodeValues.shift()
+      nodeValue = nodeValueGenerator.next()
+    }
+    nodes.unshift(currentNode)
   }
-  return args
 }
 
 function* getAmbArgs(context: Context, call: es.CallExpression) {
@@ -204,13 +221,14 @@ function* getAmbArgs(context: Context, call: es.CallExpression) {
   }
 }
 
+/*
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
   } else {
     return conditionalExpression(node.left, literal(true), node.right, node.loc!)
   }
-}
+} */
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
   // TODO: Throw an error if require does not have 0 arguments
@@ -318,7 +336,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ArrowFunctionExpression: function*(node: es.ArrowFunctionExpression, context: Context) {
-    return Closure.makeFromArrowFunction(node, currentEnvironment(context), context)
+    yield Closure.makeFromArrowFunction(node, currentEnvironment(context), context)
   },
 
   Identifier: function*(node: es.Identifier, context: Context) {
@@ -341,13 +359,17 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
 
     const calleeGenerator = evaluate(node.callee, context)
-    const calleeValue = calleeGenerator.next()
+    let calleeValue = calleeGenerator.next()
     while (!calleeValue.done) {
       const argsGenerator = getArgs(context, node)
-      const args = undefined;
+      let args = argsGenerator.next()
       const thisContext = undefined;
-      const result = yield* apply(context, callee, args, node, thisContext)
-      return result
+
+      while(!args.done) {
+        yield* apply(context, calleeValue.value, args.value, node, thisContext)
+        args = argsGenerator.next();
+      }
+      calleeValue = calleeGenerator.next();
     }
   },
 
@@ -548,7 +570,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     // tslint:disable-next-line:no-any
     const closure = new Closure(node, currentEnvironment(context), context)
     defineVariable(context, id.name, closure, true)
-    return undefined
+    yield undefined
   },
 
   IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
@@ -559,6 +581,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return yield* evaluate(node.expression, context)
   },
 
+  /*
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     let returnExpression = node.argument!
 
@@ -581,7 +604,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     } else {
       return new ReturnValue(yield* evaluate(returnExpression, context))
     }
-  },
+  }, */
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
     let value: any // tslint:disable-line
@@ -646,61 +669,36 @@ export function* apply(
   node: es.CallExpression,
   thisContext?: Value
 ) {
-  let result: Value
-  let total = 0
+  if (fun instanceof Closure) {
+    checkNumberOfArguments(context, fun, args, node!)
+    const environment = createEnvironment(fun, args, node)
+    environment.thisContext = thisContext
+    pushEnvironment(context, environment)
+    yield* evaluateBlockSatement(context, fun.node.body as es.BlockStatement)
+  } else if (typeof fun === 'function') {
+    try {
+      yield fun.apply(thisContext, args)
+    } catch (e) {
+      // Recover from exception
+      context.runtime.environments = context.runtime.environments.slice(
+        -context.numberOfOuterEnvironments
+      )
 
-  while (!(result instanceof ReturnValue)) {
-    if (fun instanceof Closure) {
-      checkNumberOfArguments(context, fun, args, node!)
-      const environment = createEnvironment(fun, args, node)
-      environment.thisContext = thisContext
-      if (result instanceof TailCallReturnValue) {
-        replaceEnvironment(context, environment)
-      } else {
-        pushEnvironment(context, environment)
-        total++
+      const loc = node ? node.loc! : constants.UNKNOWN_LOCATION
+      if (!(e instanceof RuntimeSourceError || e instanceof errors.ExceptionError)) {
+        // The error could've arisen when the builtin called a source function which errored.
+        // If the cause was a source error, we don't want to include the error.
+        // However if the error came from the builtin itself, we need to handle it.
+        return handleRuntimeError(context, new errors.ExceptionError(e, loc))
       }
-      result = yield* evaluateBlockSatement(context, fun.node.body as es.BlockStatement)
-      if (result instanceof TailCallReturnValue) {
-        fun = result.callee
-        node = result.node
-        args = result.args
-      } else if (!(result instanceof ReturnValue)) {
-        // No Return Value, set it as undefined
-        result = new ReturnValue(undefined)
-      }
-    } else if (typeof fun === 'function') {
-      try {
-        result = fun.apply(thisContext, args)
-        break
-      } catch (e) {
-        // Recover from exception
-        context.runtime.environments = context.runtime.environments.slice(
-          -context.numberOfOuterEnvironments
-        )
-
-        const loc = node ? node.loc! : constants.UNKNOWN_LOCATION
-        if (!(e instanceof RuntimeSourceError || e instanceof errors.ExceptionError)) {
-          // The error could've arisen when the builtin called a source function which errored.
-          // If the cause was a source error, we don't want to include the error.
-          // However if the error came from the builtin itself, we need to handle it.
-          return handleRuntimeError(context, new errors.ExceptionError(e, loc))
-        }
-        result = undefined
-        throw e
-      }
-    } else {
-      return handleRuntimeError(context, new errors.CallingNonFunctionValue(fun, node))
+      throw e
     }
+  } else {
+    return handleRuntimeError(context, new errors.CallingNonFunctionValue(fun, node))
   }
-  // Unwraps return value and release stack environment
-  if (result instanceof ReturnValue) {
-    result = result.value
-  }
-  for (let i = 1; i <= total; i++) {
-    popEnvironment(context)
-  }
-  return result
+
+  popEnvironment(context)
+  return
 }
 
 export { evaluate as nonDetEvaluate }
