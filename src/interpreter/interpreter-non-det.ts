@@ -331,24 +331,24 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   CallExpression: function*(node: es.CallExpression, context: Context) {
-    const callee = node.callee as es.Identifier;
-    if (callee.name === 'amb') {
-      yield* getAmbArgs(context, node)
+    const callee = node.callee;
+    if (rttc.isIdentifier(callee)) {
+      if (callee.name === 'amb') {
+        return yield* getAmbArgs(context, node)
+      } else if (callee.name === 'require') {
+        return yield* evaluateRequire(context, node)
+      }
     }
 
-    if (callee.name === 'require') {
-      yield* evaluateRequire(context, node)
+    const calleeGenerator = evaluate(node.callee, context)
+    const calleeValue = calleeGenerator.next()
+    while (!calleeValue.done) {
+      const argsGenerator = getArgs(context, node)
+      const args = undefined;
+      const thisContext = undefined;
+      const result = yield* apply(context, callee, args, node, thisContext)
+      return result
     }
-
-    /*
-    const callee = yield* evaluate(node.callee, context)
-    const args = yield* getArgs(context, node)
-    let thisContext
-    if (node.callee.type === 'MemberExpression') {
-      thisContext = yield* evaluate(node.callee.object, context)
-    }
-    const result = yield* apply(context, callee, args, node, thisContext)
-    return result */
   },
 
   NewExpression: function*(node: es.NewExpression, context: Context) {
