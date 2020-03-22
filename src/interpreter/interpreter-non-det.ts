@@ -675,7 +675,7 @@ export function* apply(
     const environment = createEnvironment(fun, args, node)
     environment.thisContext = thisContext
     pushEnvironment(context, environment)
-    yield* evaluateBlockSatement(context, fun.node.body as es.BlockStatement)
+    yield* evaluateBlockSatement(context, cloneDeep(fun.node.body) as es.BlockStatement)
   } else if (typeof fun === 'function') {
     try {
       yield fun.apply(thisContext, args)
