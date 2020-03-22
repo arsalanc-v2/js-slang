@@ -3,7 +3,7 @@ import repl = require('repl') // 'repl' here refers to the module named 'repl' i
 import util = require('util')
 import { createContext, IOptions, parseError, runInContext, resume, Result } from '../index'
 import { SuspendedNonDet, Context } from '../types'
-import { CUT } from '../constants'
+import { CUT, TRY_AGAIN } from '../constants'
 
 // stores the result obtained when execution is suspended
 let previousResult: Result
@@ -47,7 +47,7 @@ function _run(
   options: Partial<IOptions>,
   callback: (err: Error | null, result: any) => void
 ) {
-  if (cmd.trim() === 'try_again;') {
+  if (cmd.trim() === TRY_AGAIN) {
     _try_again(context, callback)
   } else {
     runInContext(cmd, context, options).then(result => {
@@ -59,8 +59,11 @@ function _run(
 function _startRepl(chapter = 1, useSubst: boolean, prelude = '') {
   // use defaults for everything
   const context = createContext(chapter)
-  const options: Partial<IOptions> = { scheduler: 'preemptive', useSubst }
-  context.executionMethod = 'non-det-interpreter'
+  const options: Partial<IOptions> = {
+    scheduler: 'non-det',
+    executionMethod: 'interpreter',
+    useSubst
+  }
   runInContext(prelude, context, options).then(preludeResult => {
     if (preludeResult.status === 'finished' || preludeResult.status === 'suspended-non-det') {
       console.dir(preludeResult.value, { depth: null })
