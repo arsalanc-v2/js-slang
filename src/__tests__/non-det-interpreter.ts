@@ -45,6 +45,20 @@ async function testNonDeterministicCode(code: string, expectedValues: any[]) {
   expect((result as Finished).value).toBe(undefined)
 }
 
+test('Test conditional expression', async () => {
+  const context = makeNonDetContext()
+  let result = await runInContext('amb(false, true) ? 4 : 6;', context, nonDetTestOptions)
+  expect(result.status).toBe('suspended-non-det')
+  expect((result as SuspendedNonDet).value).toBe(6)
+  result = await resume(result)
+  expect(result.status).toBe('suspended-non-det')
+  expect((result as SuspendedNonDet).value).toBe(4)
+
+  result = await resume(result)
+  expect(result.status).toBe('finished')
+  expect((result as Finished).value).toBe(undefined)
+})
+
 function makeNonDetContext() {
   const context = mockContext(4)
   context.executionMethod = 'non-det-interpreter'
