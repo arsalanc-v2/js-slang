@@ -96,10 +96,10 @@ function main() {
       if (err) {
         throw err
       }
-      _startRepl(4, false, data)
+      _startRepl(4.3, false, data)
     })
   } else {
-    const chapter = process.argv.length > 2 ? parseInt(firstArg, 10) : 1
+    const chapter = 4.3
     const useSubst = process.argv.length > 3 ? process.argv[3] === 'subst' : false
     _startRepl(chapter, useSubst)
   }
