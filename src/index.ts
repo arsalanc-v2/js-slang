@@ -277,7 +277,7 @@ export async function runInContext(
   } else {
     let it = evaluate(program, context)
     let scheduler: Scheduler
-    if (context.executionMethod === 'non-det-interpreter') {
+    if (theOptions.scheduler === 'non-det') {
       it = nonDetEvaluate(program, context)
       scheduler = new NonDetScheduler()
     } else if (theOptions.scheduler === 'async') {
