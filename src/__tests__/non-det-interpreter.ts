@@ -11,6 +11,10 @@ test('Empty code returns undefined', async () => {
 test('Deterministic calculation', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
 })
+
+test('Deterministic assignment', async () => {
+  await testDeterministicCode('let a = 5; a = 10; a;', 10)
+})
 // ---------------------------------- Non deterministic code tests -------------------------------
 
 test('Test simple amb application', async () => {
@@ -36,6 +40,10 @@ test('Test if-else and conditional expressions', async () => {
     }`,
     [18, 5, 'world', 'hello', false]
   )
+})
+
+test('Test assignment', async () => {
+  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
 })
 
 // ---------------------------------- Helper functions  -------------------------------------------
