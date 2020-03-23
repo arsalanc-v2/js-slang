@@ -281,6 +281,15 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
   }
 }
 
+function* evaluateConditional(node: es.IfStatement | es.ConditionalExpression, context: Context) {
+  const branchGenerator = reduceIf(node, context)
+  let branch = branchGenerator.next()
+  while (!branch.done) {
+    yield* evaluate(branch.value, context)
+    branch = branchGenerator.next()
+  }
+}
+
 /**
  * WARNING: Do not use object literal shorthands, e.g.
  *   {
@@ -409,7 +418,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ConditionalExpression: function*(node: es.ConditionalExpression, context: Context) {
-    return yield* this.IfStatement(node, context)
+    yield* evaluateConditional(node, context)
   },
 
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
@@ -558,13 +567,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return undefined
   },
 
-  IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    const branchGenerator = reduceIf(node, context)
-    let branch = branchGenerator.next()
-    while(!branch.done) {
-      yield* evaluate(branch.value, context)
-      branch = branchGenerator.next()
-    }
+  IfStatement: function*(node: es.IfStatement, context: Context) {
+    yield* evaluateConditional(node, context)
   },
 
   ExpressionStatement: function*(node: es.ExpressionStatement, context: Context) {
