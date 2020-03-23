@@ -5,6 +5,7 @@ import { AsyncScheduler } from './schedulers'
 import * as list from './stdlib/list'
 import { list_to_vector } from './stdlib/list'
 import { listPrelude } from './stdlib/list.prelude'
+import { nonDetPrelude } from './stdlib/non-det.prelude'
 import * as misc from './stdlib/misc'
 import * as parser from './stdlib/parser'
 import * as stream from './stdlib/stream'
@@ -204,6 +205,11 @@ function importPrelude(context: Context) {
   if (context.chapter >= 3) {
     prelude += streamPrelude
   }
+
+  if (context.chapter === 4.3) {
+    prelude += nonDetPrelude
+  }
+
   if (prelude !== '') {
     context.prelude = prelude
   }
