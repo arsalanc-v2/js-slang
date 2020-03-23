@@ -56,7 +56,7 @@ const nonDetTestOptions = {
 async function testDeterministicCode(code: string, expectedValue: any) {
   /* a deterministic program is equivalent to a non deterministic program
      that returns a single value */
-  testNonDeterministicCode(code, [expectedValue])
+  await testNonDeterministicCode(code, [expectedValue])
 }
 
 async function testNonDeterministicCode(code: string, expectedValues: any[]) {
