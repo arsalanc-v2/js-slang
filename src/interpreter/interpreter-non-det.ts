@@ -230,14 +230,17 @@ function* reduceIf(
   node: es.IfStatement | es.ConditionalExpression,
   context: Context
 ): IterableIterator<es.Node> {
-  const test = yield* evaluate(node.test, context)
+  const testGenerator = evaluate(node.test, context)
+  let test = testGenerator.next()
+  while (!test.done) {
+    const error = rttc.checkIfStatement(node, test.value)
+    if (error) {
+      return handleRuntimeError(context, error)
+    }
+    yield test.value ? node.consequent : node.alternate!
 
-  const error = rttc.checkIfStatement(node, test)
-  if (error) {
-    return handleRuntimeError(context, error)
+    test = testGenerator.next()
   }
-
-  return test ? node.consequent : node.alternate
 }
 
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
@@ -275,6 +278,15 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
 
     if (shouldUnshift) sequence.unshift(firstStatement)
     else return CUT
+  }
+}
+
+function* evaluateConditional(node: es.IfStatement | es.ConditionalExpression, context: Context) {
+  const branchGenerator = reduceIf(node, context)
+  let branch = branchGenerator.next()
+  while (!branch.done) {
+    yield* evaluate(branch.value, context)
+    branch = branchGenerator.next()
   }
 }
 
@@ -403,6 +415,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       leftValue = leftGenerator.next();
     }
     return
+  },
+
+  ConditionalExpression: function*(node: es.ConditionalExpression, context: Context) {
+    yield* evaluateConditional(node, context)
   },
 
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
@@ -551,8 +567,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return undefined
   },
 
-  IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    return yield* evaluate(yield* reduceIf(node, context), context)
+  IfStatement: function*(node: es.IfStatement, context: Context) {
+    yield* evaluateConditional(node, context)
   },
 
   ExpressionStatement: function*(node: es.ExpressionStatement, context: Context) {

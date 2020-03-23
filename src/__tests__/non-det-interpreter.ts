@@ -17,6 +17,27 @@ test('Test simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
+test('Test if-else and conditional expressions', async () => {
+  await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
+  await testNonDeterministicCode(
+    `if (amb(true, false)) {
+      -100;
+     } else {
+      200 / 2;
+      210;
+     }`,
+    [-100, 210]
+  )
+  await testNonDeterministicCode(
+    `if (amb(100 * 2 === 2, 40 % 2 === 0)) {
+      amb(false, 'test' === 'test') ? amb(false === false, false) ? "hello" : false : amb(5, "world");
+    } else {
+      9 * 10 / 5;
+    }`,
+    [18, 5, 'world', 'hello', false]
+  )
+})
+
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
