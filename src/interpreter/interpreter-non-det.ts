@@ -535,34 +535,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {
-    if (node.left.type === 'MemberExpression') {
-      const left = node.left
-      const obj = yield* evaluate(left.object, context)
-      let prop
-      if (left.computed) {
-        prop = yield* evaluate(left.property, context)
-      } else {
-        prop = (left.property as es.Identifier).name
-      }
-
-      const error = rttc.checkMemberAccess(node, obj, prop)
-      if (error) {
-        return handleRuntimeError(context, error)
-      }
-
-      const val = yield* evaluate(node.right, context)
-      try {
-        obj[prop] = val
-      } catch {
-        return handleRuntimeError(context, new errors.SetPropertyError(node, obj, prop))
-      }
-      return val
-    }
     const id = node.left as es.Identifier
-    // Make sure it exist
-    const value = yield* evaluate(node.right, context)
-    setVariable(context, id.name, value)
-    return value
+
+    const valueGenerator = evaluate(node.right, context)
+    let value = valueGenerator.next()
+    while (!value.done) {
+      setVariable(context, id.name, value.value)
+      yield value.value
+
+      value = valueGenerator.next()
+    }
   },
 
   FunctionDeclaration: function*(node: es.FunctionDeclaration, context: Context) {
