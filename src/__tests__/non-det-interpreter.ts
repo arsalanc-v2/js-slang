@@ -41,8 +41,8 @@ test('Test if-else and conditional expressions', async () => {
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
-  scheduler: 'preemptive',
-  executionMethod: 'non-det-interpreter'
+  scheduler: 'non-det',
+  executionMethod: 'interpreter'
 } as Partial<IOptions>
 
 async function testDeterministicCode(code: string, expectedValue: any) {
@@ -68,6 +68,6 @@ async function testNonDeterministicCode(code: string, expectedValues: any[]) {
 
 function makeNonDetContext() {
   const context = mockContext(4)
-  context.executionMethod = 'non-det-interpreter'
+  context.executionMethod = 'interpreter'
   return context
 }
