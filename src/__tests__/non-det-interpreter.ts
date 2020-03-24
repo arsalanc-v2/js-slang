@@ -25,10 +25,11 @@ test('Test builtin list functions', async () => {
     map(increment, list(1,2,3));`,
     [2,[3,[4, null]]]
   )
-
-  test('Deterministic assignment', async () => {
-  await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
+
+ test('Deterministic assignment', async () => {
+    await testDeterministicCode('let a = 5; a = 10; a;', 10)
+ })
 // ---------------------------------- Non deterministic code tests -------------------------------
 
 test('Test simple amb application', async () => {
