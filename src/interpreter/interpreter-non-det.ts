@@ -351,7 +351,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   FunctionExpression: function*(node: es.FunctionExpression, context: Context) {
-    return new Closure(node, currentEnvironment(context), context)
+    yield new Closure(node, currentEnvironment(context), context)
   },
 
   ArrowFunctionExpression: function*(node: es.ArrowFunctionExpression, context: Context) {
