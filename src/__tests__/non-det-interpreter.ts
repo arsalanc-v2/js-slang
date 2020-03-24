@@ -25,6 +25,9 @@ test('Test builtin list functions', async () => {
     map(increment, list(1,2,3));`,
     [2,[3,[4, null]]]
   )
+
+  test('Deterministic assignment', async () => {
+  await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
 // ---------------------------------- Non deterministic code tests -------------------------------
 
@@ -32,18 +35,42 @@ test('Test simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
+test('Test if-else and conditional expressions', async () => {
+  await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
+  await testNonDeterministicCode(
+    `if (amb(true, false)) {
+      -100;
+     } else {
+      200 / 2;
+      210;
+     }`,
+    [-100, 210]
+  )
+  await testNonDeterministicCode(
+    `if (amb(100 * 2 === 2, 40 % 2 === 0)) {
+      amb(false, 'test' === 'test') ? amb(false === false, false) ? "hello" : false : amb(5, "world");
+    } else {
+      9 * 10 / 5;
+    }`,
+    [18, 5, 'world', 'hello', false]
+  )
+})
+
+test('Test assignment', async () => {
+  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
+})
 
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
-  scheduler: 'preemptive',
-  executionMethod: 'non-det-interpreter'
+  scheduler: 'non-det',
+  executionMethod: 'interpreter'
 } as Partial<IOptions>
 
 async function testDeterministicCode(code: string, expectedValue: any) {
   /* a deterministic program is equivalent to a non deterministic program
      that returns a single value */
-  testNonDeterministicCode(code, [expectedValue])
+  await testNonDeterministicCode(code, [expectedValue])
 }
 
 async function testNonDeterministicCode(code: string, expectedValues: any[]) {
@@ -63,6 +90,6 @@ async function testNonDeterministicCode(code: string, expectedValues: any[]) {
 
 function makeNonDetContext() {
   const context = mockContext(4)
-  context.executionMethod = 'non-det-interpreter'
+  context.executionMethod = 'interpreter'
   return context
 }
