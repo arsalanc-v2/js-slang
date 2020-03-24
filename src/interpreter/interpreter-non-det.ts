@@ -4,7 +4,7 @@ import * as constants from '../constants'
 import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
-import { primitive } from '../utils/astCreator'
+import { primitive, conditionalExpression, literal } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
@@ -268,6 +268,14 @@ function* reduceIf(
   }
 }
 
+function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
+  if (node.operator === '&&') {
+    return conditionalExpression(node.left, node.right, literal(false), node.loc!)
+  } else {
+    return conditionalExpression(node.left, literal(true), node.right, node.loc!)
+  }
+}
+
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
 
 function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
@@ -291,6 +299,13 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     let shouldUnshift = sequenceValue.value !== CUT
 
     while (!sequenceValue.done) {
+
+      if (sequenceValue.value instanceof ReturnValue) {
+        yield sequenceValue.value
+        sequenceValue = sequenceValGenerator.next()
+        continue
+      }
+
       const res = yield* evaluateSequence(context, sequence)
       if (res === CUT) {
         // prevent unshifting of statenents before cut
@@ -586,30 +601,42 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return yield* evaluate(node.expression, context)
   },
 
-  /*
+  
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     let returnExpression = node.argument!
 
     // If we have a conditional expression, reduce it until we get something else
-    while (
-      returnExpression.type === 'LogicalExpression' ||
-      returnExpression.type === 'ConditionalExpression'
-    ) {
-      if (returnExpression.type === 'LogicalExpression') {
-        returnExpression = transformLogicalExpression(returnExpression)
+    function* getReducedConditionalExpr(returnExpression: es.Expression, context: Context)
+    : IterableIterator<es.Expression> {
+      if (
+        returnExpression.type !== 'LogicalExpression' &&
+        returnExpression.type !== 'ConditionalExpression'
+      ) {
+        yield returnExpression
+      } else {
+        if (returnExpression.type === 'LogicalExpression') {
+          returnExpression = transformLogicalExpression(returnExpression)
+        }
+        const returnExpressionGenerator = reduceIf(returnExpression, context)
+        let reducedReturnExpression = returnExpressionGenerator.next()
+        while(!reducedReturnExpression.done) {
+          yield* getReducedConditionalExpr(reducedReturnExpression.value as es.Expression, context)
+          reducedReturnExpression = returnExpressionGenerator.next()
+        }
       }
-      returnExpression = yield* reduceIf(returnExpression, context)
     }
 
-    // If we are now left with a CallExpression, then we use TCO
-    if (returnExpression.type === 'CallExpression') {
-      const callee = yield* evaluate(returnExpression.callee, context)
-      const args = yield* getArgs(context, returnExpression)
-      return new TailCallReturnValue(callee, args, returnExpression)
-    } else {
-      return new ReturnValue(yield* evaluate(returnExpression, context))
+    const reducedReturnExpressionGenerator = getReducedConditionalExpr(returnExpression, context)
+    let reducedReturnExpression = reducedReturnExpressionGenerator.next()
+
+    while(!reducedReturnExpression.done) {
+      const returnValueGenerator = evaluate(reducedReturnExpression.value, context)
+      let returnValue = returnValueGenerator.next()
+      while(!returnValue.done) {
+        yield new ReturnValue(returnValue.value)
+      }
     }
-  }, */
+  },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
     let value: any // tslint:disable-line
@@ -674,15 +701,35 @@ export function* apply(
   node: es.CallExpression,
   thisContext?: Value
 ) {
+
+  // This function takes a value that may be a ReturnValue.
+  // If so, it returns the value wrapped in the ReturnValue.
+  // If not, it returns undefined.
+  function unwrapReturnValue(result : any) {
+    if (result instanceof ReturnValue) {
+      return result.value
+    } else {
+      return undefined
+    }
+  }
+
   if (fun instanceof Closure) {
     checkNumberOfArguments(context, fun, args, node!)
     const environment = createEnvironment(fun, args, node)
     environment.thisContext = thisContext
     pushEnvironment(context, environment)
-    yield* evaluateBlockSatement(context, cloneDeep(fun.node.body) as es.BlockStatement)
+    const applicationValueGenerator =  evaluateBlockSatement(context, cloneDeep(fun.node.body) as es.BlockStatement)
+    let applicationValue = applicationValueGenerator.next()
+
+    while(!applicationValue.done) {
+      yield unwrapReturnValue(applicationValue.value)
+      applicationValue = applicationValueGenerator.next()
+    }
+
   } else if (typeof fun === 'function') {
     try {
-      yield fun.apply(thisContext, args)
+      const applicationValue = fun.apply(thisContext, args)
+      yield unwrapReturnValue(applicationValue)
     } catch (e) {
       // Recover from exception
       context.runtime.environments = context.runtime.environments.slice(
