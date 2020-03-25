@@ -316,6 +316,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     yield node.value
   },
 
+  ArrayExpression: function*(node: es.ArrayExpression, context: Context) {
+    // yield* cartesianProduct(context, node.elements as es.Expression[], [])
+  },
+
   FunctionExpression: function*(node: es.FunctionExpression, context: Context) {
     yield new Closure(node, currentEnvironment(context), context)
   },
