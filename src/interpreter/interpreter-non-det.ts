@@ -222,14 +222,13 @@ function* getAmbArgs(context: Context, call: es.CallExpression) {
   }
 }
 
-/*
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
   } else {
     return conditionalExpression(node.left, literal(true), node.right, node.loc!)
   }
-} */
+}
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
   if (call.arguments.length !== 1) {
@@ -265,14 +264,6 @@ function* reduceIf(
     yield test.value ? node.consequent : node.alternate!
 
     test = testGenerator.next()
-  }
-}
-
-function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
-  if (node.operator === '&&') {
-    return conditionalExpression(node.left, node.right, literal(false), node.loc!)
-  } else {
-    return conditionalExpression(node.left, literal(true), node.right, node.loc!)
   }
 }
 
