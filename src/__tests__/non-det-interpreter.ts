@@ -208,6 +208,22 @@ test('Require operator', async () => {
   )
 })
 
+// test('Deterministic arrays', async () => {
+//   await testDeterministicCode('const a = [[1, 2], [3, [4]]]; a;', [
+//     [1, 2],
+//     [3, [4]]
+//   ])
+// })
+
+// test('Non-deterministic arrays', async () => {
+//   await testDeterministicCode('const a = [amb(1, 2), amb(3, 4)]; a;', [
+//     [1, 3],
+//     [1, 4],
+//     [2, 3],
+//     [2, 4]
+//   ])
+// })
+
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
