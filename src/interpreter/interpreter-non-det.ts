@@ -4,7 +4,7 @@ import * as constants from '../constants'
 import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
-import { primitive, conditionalExpression, literal } from '../utils/astCreator'
+import { primitive } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
@@ -221,14 +221,14 @@ function* getAmbArgs(context: Context, call: es.CallExpression) {
     assignIn(context, cloneDeep(originalContext)) // reset context
   }
 }
-
+/*
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
   } else {
     return conditionalExpression(node.left, literal(true), node.right, node.loc!)
   }
-}
+}*/
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
   if (call.arguments.length !== 1) {
@@ -595,39 +595,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     const returnExpression = node.argument!
 
-    // If we have a conditional expression, reduce it until we get something else
-    function* getReducedConditionalExpr(expr: es.Expression, ctxt: Context)
-    : IterableIterator<es.Expression> {
-      if (
-        expr.type !== 'LogicalExpression' &&
-        expr.type !== 'ConditionalExpression'
-      ) {
-        yield expr
-      } else {
-        if (expr.type === 'LogicalExpression') {
-          expr = transformLogicalExpression(expr)
-        }
-        const returnExpressionGenerator = reduceIf(expr, ctxt)
-        let reducedExpression = returnExpressionGenerator.next()
-        while(!reducedExpression.done) {
-          yield* getReducedConditionalExpr(reducedExpression.value as es.Expression, context)
-          reducedExpression = returnExpressionGenerator.next()
-        }
-      }
+    const returnValueGenerator = evaluate(returnExpression, context)
+    let returnValue = returnValueGenerator.next()
+    while(!returnValue.done) {
+      yield new ReturnValue(returnValue.value)
+      returnValue = returnValueGenerator.next()
     }
-
-    const reducedReturnExpressionGenerator = getReducedConditionalExpr(returnExpression, context)
-    let reducedReturnExpression = reducedReturnExpressionGenerator.next()
-
-    while(!reducedReturnExpression.done) {
-      const returnValueGenerator = evaluate(reducedReturnExpression.value, context)
-      let returnValue = returnValueGenerator.next()
-      while(!returnValue.done) {
-        yield new ReturnValue(returnValue.value)
-        returnValue = returnValueGenerator.next()
-      }
-      reducedReturnExpression = reducedReturnExpressionGenerator.next()
-    }
+  
   },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
