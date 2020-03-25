@@ -601,7 +601,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       yield new ReturnValue(returnValue.value)
       returnValue = returnValueGenerator.next()
     }
-  
+
   },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
@@ -687,13 +687,10 @@ export function* apply(
       context,
       cloneDeep(fun.node.body) as es.BlockStatement
     )
-    let applicationValue = applicationValueGenerator.next()
-
-    while (!applicationValue.done) {
+    for (const applicationValue of applicationValueGenerator) {
       popEnvironment(context)
-      yield unwrapReturnValue(applicationValue.value, undefined)
+      yield unwrapReturnValue(applicationValue, undefined)
       pushEnvironment(context, environment)
-      applicationValue = applicationValueGenerator.next()
     }
   } else if (typeof fun === 'function') {
     try {
