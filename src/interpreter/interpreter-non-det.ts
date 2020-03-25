@@ -299,7 +299,6 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     let shouldUnshift = sequenceValue.value !== CUT
 
     while (!sequenceValue.done) {
-
       if (sequenceValue.value instanceof ReturnValue) {
         yield sequenceValue.value
         sequenceValue = sequenceValGenerator.next()
@@ -601,27 +600,27 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return yield* evaluate(node.expression, context)
   },
 
-  
+
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
-    let returnExpression = node.argument!
+    const returnExpression = node.argument!
 
     // If we have a conditional expression, reduce it until we get something else
-    function* getReducedConditionalExpr(returnExpression: es.Expression, context: Context)
+    function* getReducedConditionalExpr(expr: es.Expression, ctxt: Context)
     : IterableIterator<es.Expression> {
       if (
-        returnExpression.type !== 'LogicalExpression' &&
-        returnExpression.type !== 'ConditionalExpression'
+        expr.type !== 'LogicalExpression' &&
+        expr.type !== 'ConditionalExpression'
       ) {
-        yield returnExpression
+        yield expr
       } else {
-        if (returnExpression.type === 'LogicalExpression') {
-          returnExpression = transformLogicalExpression(returnExpression)
+        if (expr.type === 'LogicalExpression') {
+          expr = transformLogicalExpression(expr)
         }
-        const returnExpressionGenerator = reduceIf(returnExpression, context)
-        let reducedReturnExpression = returnExpressionGenerator.next()
-        while(!reducedReturnExpression.done) {
-          yield* getReducedConditionalExpr(reducedReturnExpression.value as es.Expression, context)
-          reducedReturnExpression = returnExpressionGenerator.next()
+        const returnExpressionGenerator = reduceIf(expr, ctxt)
+        let reducedExpression = returnExpressionGenerator.next()
+        while(!reducedExpression.done) {
+          yield* getReducedConditionalExpr(reducedExpression.value as es.Expression, context)
+          reducedExpression = returnExpressionGenerator.next()
         }
       }
     }
@@ -634,7 +633,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       let returnValue = returnValueGenerator.next()
       while(!returnValue.done) {
         yield new ReturnValue(returnValue.value)
+        returnValue = returnValueGenerator.next()
       }
+      reducedReturnExpression = reducedReturnExpressionGenerator.next()
     }
   },
 
@@ -701,15 +702,14 @@ export function* apply(
   node: es.CallExpression,
   thisContext?: Value
 ) {
-
   // This function takes a value that may be a ReturnValue.
   // If so, it returns the value wrapped in the ReturnValue.
-  // If not, it returns undefined.
-  function unwrapReturnValue(result : any) {
+  // If not, it returns the default value.
+  function unwrapReturnValue(result: any, defaultValue: any) {
     if (result instanceof ReturnValue) {
       return result.value
     } else {
-      return undefined
+      return defaultValue
     }
   }
 
@@ -718,18 +718,21 @@ export function* apply(
     const environment = createEnvironment(fun, args, node)
     environment.thisContext = thisContext
     pushEnvironment(context, environment)
-    const applicationValueGenerator =  evaluateBlockSatement(context, cloneDeep(fun.node.body) as es.BlockStatement)
+    const applicationValueGenerator = evaluateBlockSatement(
+      context,
+      cloneDeep(fun.node.body) as es.BlockStatement
+    )
     let applicationValue = applicationValueGenerator.next()
 
-    while(!applicationValue.done) {
-      yield unwrapReturnValue(applicationValue.value)
+    while (!applicationValue.done) {
+      popEnvironment(context)
+      yield unwrapReturnValue(applicationValue.value, undefined)
+      pushEnvironment(context, environment)
       applicationValue = applicationValueGenerator.next()
     }
-
   } else if (typeof fun === 'function') {
     try {
-      const applicationValue = fun.apply(thisContext, args)
-      yield unwrapReturnValue(applicationValue)
+      yield fun.apply(thisContext, args)
     } catch (e) {
       // Recover from exception
       context.runtime.environments = context.runtime.environments.slice(
