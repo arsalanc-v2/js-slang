@@ -456,7 +456,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   LogicalExpression: function*(node: es.LogicalExpression, context: Context) {
-    yield* evaluateConditional(transformLogicalExpression(node), context)
+    const conditional: es.ConditionalExpression = transformLogicalExpression(node)
+    yield* evaluateConditional(conditional, context)
   },
 
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
