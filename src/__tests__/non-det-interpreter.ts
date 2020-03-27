@@ -89,6 +89,16 @@ test('Test assignment', async () => {
   await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
 })
 
+test('Test functions with non deterministic terms', async () => {
+  await testNonDeterministicCode(
+    `function foo() {
+      return amb(true, false) ? 'a string' : amb(10, 20);
+     }
+     foo();`,
+    ['a string', 10, 20]
+  )
+})
+
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
