@@ -317,7 +317,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ArrayExpression: function*(node: es.ArrayExpression, context: Context) {
-    // yield* cartesianProduct(context, node.elements as es.Expression[], [])
+    yield* cartesianProduct(context, node.elements as es.Expression[], [])
   },
 
   FunctionExpression: function*(node: es.FunctionExpression, context: Context) {
@@ -347,13 +347,59 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       }
     }
 
+    let thisContext
+    if (callee.type === 'MemberExpression') {
+      thisContext = yield* evaluate(callee.object, context)
+    }
+
     const calleeGenerator = evaluate(node.callee, context)
     for (const calleeValue of calleeGenerator) {
       const argsGenerator = getArgs(context, node)
       for(const args of argsGenerator) {
-        yield* apply(context, calleeValue, args, node, undefined)
+        yield* apply(context, calleeValue, args, node, thisContext)
       }
     }
+  },
+
+  MemberExpression: function*(node: es.MemberExpression, context: Context) {
+    const objGenerator = evaluate(node.object, context)
+
+    for (let obj of objGenerator) {
+      if (obj instanceof Closure) {
+        obj = obj.fun
+      }
+      if (node.computed) {
+        const propGenerator = evaluate(node.property, context)
+        for (const prop of propGenerator) {
+          return yield* accessMember(obj, prop)
+        }
+      } else {
+        const prop = (node.property as es.Identifier).name
+        return yield* accessMember(obj, prop)
+      }
+    }
+
+    function* accessMember(obj: any, prop: any) {
+      const error = rttc.checkMemberAccess(node, obj, prop)
+      if (error) {
+        return yield handleRuntimeError(context, error)
+      }
+
+      if (
+        obj !== null &&
+        obj !== undefined &&
+        typeof obj[prop] !== 'undefined' &&
+        !obj.hasOwnProperty(prop)
+      ) {
+        return yield handleRuntimeError(context, new errors.GetInheritedPropertyError(node, obj, prop))
+      }
+      try {
+        yield obj[prop]
+      } catch {
+        return yield handleRuntimeError(context, new errors.GetPropertyError(node, obj, prop))
+      }
+    }
+    return
   },
 
   UnaryExpression: function*(node: es.UnaryExpression, context: Context) {
@@ -405,6 +451,39 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {
+    if (node.left.type === 'MemberExpression') {
+      const left = node.left
+      const objGenerator = evaluate(left.object, context)
+      for (const obj of objGenerator) {
+        if (left.computed) {
+          const propGenerator = evaluate(left.property, context)
+          for (const prop of propGenerator) {
+            return yield* assignMember(obj, prop)
+          }
+        } else {
+          const prop = (left.property as es.Identifier).name
+          return yield* assignMember(obj, prop)
+        }
+      }
+
+      function* assignMember(obj: any, prop: any) {
+        const error = rttc.checkMemberAccess(node, obj, prop)
+        if (error) {
+          return yield handleRuntimeError(context, error)
+        }
+
+        const valGenerator = evaluate(node.right, context)
+        for (const val of valGenerator) {
+          try {
+            obj[prop] = val
+          } catch {
+            return yield handleRuntimeError(context, new errors.SetPropertyError(node, obj, prop))
+          }
+          return yield val
+        }
+      }
+    }
+
     const id = node.left as es.Identifier
 
     const valueGenerator = evaluate(node.right, context)

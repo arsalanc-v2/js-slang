@@ -158,7 +158,7 @@ test('Empty amb application', async () => {
   await testNonDeterministicCode('amb();', [])
 })
 
-test('Simple amb application', async () => {
+test('Test simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
@@ -208,21 +208,27 @@ test('Require operator', async () => {
   )
 })
 
-// test('Deterministic arrays', async () => {
-//   await testDeterministicCode('const a = [[1, 2], [3, [4]]]; a;', [
-//     [1, 2],
-//     [3, [4]]
-//   ])
-// })
+test('Array access', async () => {
+  await testDeterministicCode('[];', [])
 
-// test('Non-deterministic arrays', async () => {
-//   await testDeterministicCode('const a = [amb(1, 2), amb(3, 4)]; a;', [
-//     [1, 3],
-//     [1, 4],
-//     [2, 3],
-//     [2, 4]
-//   ])
-// })
+  await testDeterministicCode('const a = [[1, 2], [3, [4]]]; a;', [
+    [1, 2],
+    [3, [4]]
+  ])
+
+  await testDeterministicCode('const a = [[[[6]]]]; a[0][0][0][0];', 6)
+
+  await testDeterministicCode('const f = () => 2; const a = [1, f(), 3]; a;', [1, 2, 3])
+})
+
+test('Non-deterministic arrays', async () => {
+  await testNonDeterministicCode('const a = [amb(1, 2), amb(3, 4)]; a;', [
+    [1, 3],
+    [1, 4],
+    [2, 3],
+    [2, 4]
+  ])
+})
 
 // ---------------------------------- Helper functions  -------------------------------------------
 
