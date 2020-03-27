@@ -12,6 +12,49 @@ test('Deterministic calculation', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
 })
 
+test('Deterministic function applications', async () => {
+  await testDeterministicCode(
+    `function factorial(n) {
+      return n === 0 ? 1 : n * factorial(n - 1);
+     }
+     factorial(5);
+    `,
+    120
+  )
+
+  await testDeterministicCode(
+    `function noReturnStatement_returnsUndefined() {
+       20 + 40 - 6;
+       5 - 5;
+       list();
+       reverse(list(1));
+     }`,
+    undefined
+  )
+})
+
+test('Test builtin list functions', async () => {
+  await testDeterministicCode('pair(false, 10);', [false, 10])
+  await testDeterministicCode('list();', null)
+  await testDeterministicCode('list(1);', [1, null])
+  await testDeterministicCode('head(list(1));', 1)
+  await testDeterministicCode('tail(list(1));', null)
+})
+
+test('Test prelude list functions', async () => {
+  await testDeterministicCode('is_null(null);', true)
+  await testDeterministicCode('is_null(list(null));', false)
+  await testDeterministicCode(
+    `function increment(n) { return n + 1; }
+     map(increment, list(100, 101, 200));
+    `,
+    [101, [102, [201, null]]]
+  )
+  await testDeterministicCode('append(list(5), list(6,20));', [5, [6, [20, null]]])
+  await testDeterministicCode('append(list(4,5), list());', [4, [5, null]])
+  await testDeterministicCode('reverse(list("hello", true, 0));', [0, [true, ['hello', null]]])
+})
+
 test('Deterministic assignment', async () => {
   await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
@@ -46,6 +89,16 @@ test('Test assignment', async () => {
   await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
 })
 
+test('Test functions with non deterministic terms', async () => {
+  await testNonDeterministicCode(
+    `function foo() {
+      return amb(true, false) ? 'a string' : amb(10, 20);
+     }
+     foo();`,
+    ['a string', 10, 20]
+  )
+})
+
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
@@ -64,14 +117,14 @@ async function testNonDeterministicCode(code: string, expectedValues: any[]) {
   let result: Result = await runInContext(code, context, nonDetTestOptions)
   const numOfRuns = expectedValues.length
   for (let i = 0; i < numOfRuns; i++) {
-    expect((result as SuspendedNonDet).value).toBe(expectedValues[i])
-    expect(result.status).toBe('suspended-non-det')
+    expect((result as SuspendedNonDet).value).toEqual(expectedValues[i])
+    expect(result.status).toEqual('suspended-non-det')
     result = await resume(result)
   }
 
   // all non deterministic programs have a final result whose value is undefined
-  expect(result.status).toBe('finished')
-  expect((result as Finished).value).toBe(undefined)
+  expect(result.status).toEqual('finished')
+  expect((result as Finished).value).toEqual(undefined)
 }
 
 function makeNonDetContext() {
