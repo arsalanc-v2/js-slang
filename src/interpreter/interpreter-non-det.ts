@@ -175,6 +175,28 @@ const checkNumberOfArguments = (
   return undefined
 }
 
+/**
+ * Returns a random integer for a given interval (inclusive).
+ */
+function randomInt(min: number, max: number): number {
+  console.assert(max >= min)
+
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
+function* getAmbRArgs(context: Context, call: es.CallExpression) {
+  const originalContext = cloneDeep(context)
+
+  const args: es.Node[] = call.arguments
+  while (args.length > 0) {
+    const r = randomInt(0, args.length - 1)
+    const arg: es.Node = args.splice(r, 1)[0]
+
+    yield* evaluate(arg, context)
+    assignIn(context, cloneDeep(originalContext))
+  }
+}
+
 function* getArgs(context: Context, call: es.CallExpression) {
   const args = cloneDeep(call.arguments)
   return yield* cartesianProduct(context, args as es.Expression[], [])
@@ -314,7 +336,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (rttc.isIdentifier(callee)) {
       if (callee.name === 'amb') {
         return yield* getAmbArgs(context, node)
-      }
+      } else if (callee.name === 'ambR') {
+        return yield* getAmbRArgs(context, node)
+      } 
     }
 
     const calleeGenerator = evaluate(node.callee, context)
