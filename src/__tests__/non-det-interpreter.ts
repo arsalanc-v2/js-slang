@@ -225,7 +225,7 @@ test('Empty amb application', async () => {
   await testNonDeterministicCode('amb();', [])
 })
 
-test('Simple amb application', async () => {
+test('Test simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
