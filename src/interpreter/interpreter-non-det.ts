@@ -187,7 +187,7 @@ function randomInt(min: number, max: number): number {
 function* getAmbRArgs(context: Context, call: es.CallExpression) {
   const originalContext = cloneDeep(context)
 
-  const args: es.Node[] = call.arguments
+  const args: es.Node[] = cloneDeep(call.arguments)
   while (args.length > 0) {
     const r = randomInt(0, args.length - 1)
     const arg: es.Node = args.splice(r, 1)[0]
