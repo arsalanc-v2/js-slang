@@ -5,6 +5,10 @@ test('An element of', async () => {
   await testNonDeterministicCode(`an_element_of(list(1, 2, list(3, 4)));`, [1, 2, [3, [4, null]]])
 })
 
+test('An integer between', async () => {
+  await testNonDeterministicCode('an_integer_between(5, 10);', [5, 6, 7, 8, 9, 10])
+})
+
 test('Multiple dwelling problem', async () => {
   await testNonDeterministicCode(
     `function multiple_dwelling() {
