@@ -3,24 +3,70 @@ import { runInContext, resume, IOptions, Result } from '../index'
 import { mockContext } from '../mocks/context'
 import { SuspendedNonDet, Finished } from '../types'
 
-// ---------------------------------- Deterministic code tests --------------------------------
 test('Empty code returns undefined', async () => {
   await testDeterministicCode('', undefined)
 })
 
-test('Calculation', async () => {
+test('Unary operations', async () => {
+  await testDeterministicCode('-12 - 8;', -20)
+  await testDeterministicCode('!true;', false)
+  await testDeterministicCode('!(false);', true)
+})
+
+test('Unary operations with non deterministic terms', async () => {
+  await testNonDeterministicCode('-amb(12, 24) - 8;', [-20, -32])
+  await testNonDeterministicCode('!amb(true, false);', [false, true])
+})
+
+test('Binary operations', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
+  await testDeterministicCode('"hello" + " world" + "!";', 'hello world!')
+  await testDeterministicCode('(23 % 3) * (10 / 2);', 10)
+})
+
+test('Binary operations with non deterministic terms', async () => {
+  await testNonDeterministicCode('1 + amb(4) - 10 * 5;', [-45])
+  await testNonDeterministicCode('amb("hello", "bye") + " world" + "!";', [
+    'hello world!',
+    'bye world!'
+  ])
+  await testNonDeterministicCode('amb((23 % 3), 7) * amb((10 / 2), 19 - 5);', [10, 28, 35, 98])
 })
 
 test('Assignment', async () => {
   await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
 
-test('Unary operations', async () => {
-  await testDeterministicCode('-12 - 8;', -20)
+test('Assignment with non deterministic terms', async () => {
+  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
 
-  await testDeterministicCode('!true;', false)
-  await testDeterministicCode('!(false);', true)
+  await testNonDeterministicCode(
+    `let num = 5;
+    function reassign_num() { num = 10; return num; }
+    amb(reassign_num(), num);`,
+    [10, 5]
+  )
+})
+
+test('If-else and conditional expressions with non deterministic terms', async () => {
+  await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
+  await testNonDeterministicCode(
+    `if (amb(true, false)) {
+      -100;
+     } else {
+      200 / 2;
+      210;
+     }`,
+    [-100, 210]
+  )
+  await testNonDeterministicCode(
+    `if (amb(100 * 2 === 2, 40 % 2 === 0)) {
+      amb(false, 'test' === 'test') ? amb(false === false, false) ? "hello" : false : amb(5, "world");
+    } else {
+      9 * 10 / 5;
+    }`,
+    [18, 5, 'world', 'hello', false]
+  )
 })
 
 test('Logical expressions', async () => {
@@ -36,6 +82,14 @@ test('Logical expressions', async () => {
     `function foo() { return foo(); }\
     false && foo();`,
     false
+  )
+})
+
+test('Logical expressions with non deterministic terms', async () => {
+  await testNonDeterministicCode(
+    `amb(true, false) && amb(false, true) || amb(false);
+    `,
+    [false, true, false]
   )
 })
 
@@ -73,6 +127,19 @@ test('Builtin list functions', async () => {
   await testDeterministicCode('tail(list(1));', null)
 })
 
+test('Builtin list functions with non deterministic terms', async () => {
+  await testNonDeterministicCode('pair(amb(false, true), 10);', [
+    [false, 10],
+    [true, 10]
+  ])
+  await testNonDeterministicCode('list(amb());', [])
+  await testNonDeterministicCode('list(amb(1,2));', [
+    [1, null],
+    [2, null]
+  ])
+  await testNonDeterministicCode('head(amb(list(100), list(20, 30)));', [100, 20])
+})
+
 test('Prelude list functions', async () => {
   await testDeterministicCode('is_null(null);', true)
   await testDeterministicCode('is_null(list(null));', false)
@@ -87,47 +154,12 @@ test('Prelude list functions', async () => {
   await testDeterministicCode('reverse(list("hello", true, 0));', [0, [true, ['hello', null]]])
 })
 
-// ---------------------------------- Non deterministic code tests -------------------------------
-
 test('Empty amb application', async () => {
   await testNonDeterministicCode('amb();', [])
 })
 
 test('Simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
-})
-
-test('Assignment', async () => {
-  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
-})
-
-test('If-else and conditional expressions', async () => {
-  await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
-  await testNonDeterministicCode(
-    `if (amb(true, false)) {
-      -100;
-     } else {
-      200 / 2;
-      210;
-     }`,
-    [-100, 210]
-  )
-  await testNonDeterministicCode(
-    `if (amb(100 * 2 === 2, 40 % 2 === 0)) {
-      amb(false, 'test' === 'test') ? amb(false === false, false) ? "hello" : false : amb(5, "world");
-    } else {
-      9 * 10 / 5;
-    }`,
-    [18, 5, 'world', 'hello', false]
-  )
-})
-
-test('Logical expressions', async () => {
-  await testNonDeterministicCode(
-    `amb(true, false) && amb(false, true) || amb(false);
-    `,
-    [false, true, false]
-  )
 })
 
 test('Functions with non deterministic terms', async () => {
@@ -162,16 +194,6 @@ test('Combinations of amb', async () => {
   ])
 })
 
-test('Undoing state changes in a particular amb world', async () => {
-  await testNonDeterministicCode(
-    '\
-    let num = 5;\
-    function reassign_num() { num = 10; return num; }\
-    amb(reassign_num(), num);',
-    [10, 5]
-  )
-})
-
 test('Require operator', async () => {
   await testNonDeterministicCode(
     ' \
@@ -193,13 +215,13 @@ const nonDetTestOptions = {
   executionMethod: 'interpreter'
 } as Partial<IOptions>
 
-async function testDeterministicCode(code: string, expectedValue: any) {
+export async function testDeterministicCode(code: string, expectedValue: any) {
   /* a deterministic program is equivalent to a non deterministic program
      that returns a single value */
   await testNonDeterministicCode(code, [expectedValue])
 }
 
-async function testNonDeterministicCode(code: string, expectedValues: any[]) {
+export async function testNonDeterministicCode(code: string, expectedValues: any[]) {
   const context = makeNonDetContext()
   let result: Result = await runInContext(code, context, nonDetTestOptions)
   const numOfRuns = expectedValues.length
@@ -215,7 +237,7 @@ async function testNonDeterministicCode(code: string, expectedValues: any[]) {
 }
 
 function makeNonDetContext() {
-  const context = mockContext(4)
+  const context = mockContext(4.3)
   context.executionMethod = 'interpreter'
   return context
 }
