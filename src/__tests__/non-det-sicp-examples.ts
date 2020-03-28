@@ -2,16 +2,8 @@
 import { testNonDeterministicCode } from './non-det-interpreter'
 
 test('An element of', async () => {
-  await testNonDeterministicCode(
-      `function an_element_of(items) {
-        require(!is_null(items));
-        return amb(head(items), an_element_of(tail(items)));
-       }
-
-       an_element_of(list(1, 2, list(3, 4)));`,
-       [1, 2, [3, [4, null]]])
+  await testNonDeterministicCode(`an_element_of(list(1, 2, list(3, 4)));`, [1, 2, [3, [4, null]]])
 })
-
 
 test('Multiple dwelling problem', async () => {
   await testNonDeterministicCode(
