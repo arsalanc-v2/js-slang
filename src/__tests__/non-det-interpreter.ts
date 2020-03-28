@@ -8,32 +8,22 @@ test('Empty code returns undefined', async () => {
   await testDeterministicCode('', undefined)
 })
 
-test('Deterministic calculation', async () => {
+test('Calculation', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
 })
 
-test('Deterministic function applications', async () => {
-  await testDeterministicCode(
-    `function factorial(n) {
-      return n === 0 ? 1 : n * factorial(n - 1);
-     }
-     factorial(5);
-    `,
-    120
-  )
-
-  await testDeterministicCode(
-    `function noReturnStatement_returnsUndefined() {
-       20 + 40 - 6;
-       5 - 5;
-       list();
-       reverse(list(1));
-     }`,
-    undefined
-  )
+test('Assignment', async () => {
+  await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
 
-test('Deterministic logical expressions', async () => {
+test('Unary operations', async () => {
+  await testDeterministicCode('-12 - 8;', -20)
+
+  await testDeterministicCode('!true;', false)
+  await testDeterministicCode('!(false);', true)
+})
+
+test('Logical expressions', async () => {
   await testDeterministicCode(`true && (false || true) && (true && false);`, false)
 
   await testDeterministicCode(
@@ -49,7 +39,33 @@ test('Deterministic logical expressions', async () => {
   )
 })
 
-test('Test builtin list functions', async () => {
+test('Function applications', async () => {
+  await testDeterministicCode(
+    `function factorial(n) {
+      return n === 0 ? 1 : n * factorial(n - 1);
+     }
+     factorial(5);
+    `,
+    120
+  )
+
+  await testDeterministicCode(
+    'function f(x) { function subfunction(y) {  return y * 2; } return x * subfunction(10); } f(6);',
+    120
+  )
+
+  await testDeterministicCode(
+    `function noReturnStatement_returnsUndefined() {
+       20 + 40 - 6;
+       5 - 5;
+       list();
+       reverse(list(1));
+     }`,
+    undefined
+  )
+})
+
+test('Builtin list functions', async () => {
   await testDeterministicCode('pair(false, 10);', [false, 10])
   await testDeterministicCode('list();', null)
   await testDeterministicCode('list(1);', [1, null])
@@ -57,7 +73,7 @@ test('Test builtin list functions', async () => {
   await testDeterministicCode('tail(list(1));', null)
 })
 
-test('Test prelude list functions', async () => {
+test('Prelude list functions', async () => {
   await testDeterministicCode('is_null(null);', true)
   await testDeterministicCode('is_null(list(null));', false)
   await testDeterministicCode(
@@ -71,16 +87,21 @@ test('Test prelude list functions', async () => {
   await testDeterministicCode('reverse(list("hello", true, 0));', [0, [true, ['hello', null]]])
 })
 
-test('Deterministic assignment', async () => {
-  await testDeterministicCode('let a = 5; a = 10; a;', 10)
-})
 // ---------------------------------- Non deterministic code tests -------------------------------
 
-test('Test simple amb application', async () => {
+test('Empty amb application', async () => {
+  await testNonDeterministicCode('amb();', [])
+})
+
+test('Simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
-test('Test if-else and conditional expressions', async () => {
+test('Assignment', async () => {
+  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
+})
+
+test('If-else and conditional expressions', async () => {
   await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
   await testNonDeterministicCode(
     `if (amb(true, false)) {
@@ -101,11 +122,15 @@ test('Test if-else and conditional expressions', async () => {
   )
 })
 
-test('Test assignment', async () => {
-  await testNonDeterministicCode('let a = amb(1, 2); a = amb(4, 5); a;', [4, 5, 4, 5])
+test('Logical expressions', async () => {
+  await testNonDeterministicCode(
+    `amb(true, false) && amb(false, true) || amb(false);
+    `,
+    [false, true, false]
+  )
 })
 
-test('Test functions with non deterministic terms', async () => {
+test('Functions with non deterministic terms', async () => {
   await testNonDeterministicCode(
     `function foo() {
       return amb(true, false) ? 'a string' : amb(10, 20);
@@ -115,11 +140,49 @@ test('Test functions with non deterministic terms', async () => {
   )
 })
 
-test('Test binary expressions', async () => {
+test('Functions as amb arguments', async () => {
   await testNonDeterministicCode(
-    `amb(true, false) && amb(false, true) || amb(false);
-    `,
-    [false, true, false]
+    ' const is_even = num => (num % 2) === 0;\
+      const add_five = num => num + 5;\
+      const nondet_func = amb(is_even, add_five, num => !is_even(num));\
+      nondet_func(5);\
+    ',
+    [false, 10, true]
+  )
+})
+
+test('Combinations of amb', async () => {
+  await testNonDeterministicCode('list(amb(1, 2, 3), amb("a", "b"));', [
+    [1, ['a', null]],
+    [1, ['b', null]],
+    [2, ['a', null]],
+    [2, ['b', null]],
+    [3, ['a', null]],
+    [3, ['b', null]]
+  ])
+})
+
+test('Undoing state changes in a particular amb world', async () => {
+  await testNonDeterministicCode(
+    '\
+    let num = 5;\
+    function reassign_num() { num = 10; return num; }\
+    amb(reassign_num(), num);',
+    [10, 5]
+  )
+})
+
+test('Require operator', async () => {
+  await testNonDeterministicCode(
+    ' \
+      function int_between(low, high) { \
+        return low > high ? amb() : amb(low, int_between(low + 1, high)); \
+      } \
+      let integer = int_between(5, 10);\
+      require(integer % 3 === 0); \
+      integer;\
+    ',
+    [6, 9]
   )
 })
 
