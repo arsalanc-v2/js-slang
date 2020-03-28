@@ -9,6 +9,20 @@ test('An integer between', async () => {
   await testNonDeterministicCode('an_integer_between(5, 10);', [5, 6, 7, 8, 9, 10])
 })
 
+test('Pythagorean triple', async () => {
+  await testNonDeterministicCode(
+    `function a_pythagorean_triple_between(low, high) {
+         const i = an_integer_between(low, high);
+         const j = an_integer_between(i, high);
+         const k = an_integer_between(j, high);
+         require(i * i + j * j === k * k);
+         return list(i, j, k);
+       }
+       a_pythagorean_triple_between(3, 5);`,
+    [[3, [4, [5, null]]]]
+  )
+})
+
 test('Multiple dwelling problem', async () => {
   await testNonDeterministicCode(
     `function multiple_dwelling() {
