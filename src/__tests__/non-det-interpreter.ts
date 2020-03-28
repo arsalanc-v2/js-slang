@@ -33,6 +33,22 @@ test('Deterministic function applications', async () => {
   )
 })
 
+test('Deterministic logical expressions', async () => {
+  await testDeterministicCode(`true && (false || true) && (true && false);`, false)
+
+  await testDeterministicCode(
+    `function foo() { return foo(); }\
+      true || foo();`,
+    true
+  )
+
+  await testDeterministicCode(
+    `function foo() { return foo(); }\
+    false && foo();`,
+    false
+  )
+})
+
 test('Test builtin list functions', async () => {
   await testDeterministicCode('pair(false, 10);', [false, 10])
   await testDeterministicCode('list();', null)
@@ -96,6 +112,14 @@ test('Test functions with non deterministic terms', async () => {
      }
      foo();`,
     ['a string', 10, 20]
+  )
+})
+
+test('Test binary expressions', async () => {
+  await testNonDeterministicCode(
+    `amb(true, false) && amb(false, true) || amb(false);
+    `,
+    [false, true, false]
   )
 })
 
