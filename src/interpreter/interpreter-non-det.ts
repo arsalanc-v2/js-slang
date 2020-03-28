@@ -4,7 +4,7 @@ import * as constants from '../constants'
 import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
-import { primitive } from '../utils/astCreator'
+import { primitive, conditionalExpression, literal } from '../utils/astCreator'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
@@ -221,14 +221,14 @@ function* getAmbArgs(context: Context, call: es.CallExpression) {
     assignIn(context, cloneDeep(originalContext)) // reset context
   }
 }
-/*
+
 function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalExpression {
   if (node.operator === '&&') {
     return conditionalExpression(node.left, node.right, literal(false), node.loc!)
   } else {
     return conditionalExpression(node.left, literal(true), node.right, node.loc!)
   }
-}*/
+}
 
 function* evaluateRequire(context: Context, call: es.CallExpression) {
   if (call.arguments.length !== 1) {
@@ -453,6 +453,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ConditionalExpression: function*(node: es.ConditionalExpression, context: Context) {
     yield* evaluateConditional(node, context)
+  },
+
+  LogicalExpression: function*(node: es.LogicalExpression, context: Context) {
+    const conditional: es.ConditionalExpression = transformLogicalExpression(node)
+    yield* evaluateConditional(conditional, context)
   },
 
   VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
