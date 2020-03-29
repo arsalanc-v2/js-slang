@@ -313,10 +313,8 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
 
 function* evaluateConditional(node: es.IfStatement | es.ConditionalExpression, context: Context) {
   const branchGenerator = reduceIf(node, context)
-  let branch = branchGenerator.next()
-  while (!branch.done) {
-    yield* evaluate(branch.value, context)
-    branch = branchGenerator.next()
+  for (const branch of branchGenerator) {
+    yield* evaluate(branch, context)
   }
 }
 
