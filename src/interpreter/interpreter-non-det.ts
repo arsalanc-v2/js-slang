@@ -276,15 +276,13 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     yield* sequenceValGenerator
   } else {
     sequence.shift()
-    let sequenceValue = sequenceValGenerator.next()
+    let shouldUnshift = true
+    for (const sequenceValue of sequenceValGenerator) {
+      // prevent unshifting of cut operator
+      shouldUnshift = sequenceValue !== CUT
 
-    // prevent unshifting of cut operator
-    let shouldUnshift = sequenceValue.value !== CUT
-
-    while (!sequenceValue.done) {
-      if (sequenceValue.value instanceof ReturnValue) {
-        yield sequenceValue.value
-        sequenceValue = sequenceValGenerator.next()
+      if (sequenceValue instanceof ReturnValue) {
+        yield sequenceValue
         continue
       }
 
@@ -294,8 +292,6 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
         shouldUnshift = false
         break
       }
-
-      sequenceValue = sequenceValGenerator.next()
     }
 
     if (shouldUnshift) sequence.unshift(firstStatement)
