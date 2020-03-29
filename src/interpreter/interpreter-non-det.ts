@@ -416,37 +416,27 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function*(node: es.UnaryExpression, context: Context) {
     const argGenerator = evaluate(node.argument, context)
-    let argValue = argGenerator.next()
-
-    while (!argValue.done) {
-      const error = rttc.checkUnaryExpression(node, node.operator, argValue.value)
+    for (const argValue of argGenerator) {
+      const error = rttc.checkUnaryExpression(node, node.operator, argValue)
       if (error) {
         return handleRuntimeError(context, error)
       }
-
-      yield evaluateUnaryExpression(node.operator, argValue.value)
-      argValue = argGenerator.next()
+      yield evaluateUnaryExpression(node.operator, argValue)
     }
     return
   },
 
   BinaryExpression: function*(node: es.BinaryExpression, context: Context) {
     const leftGenerator = evaluate(node.left, context)
-    let leftValue = leftGenerator.next();
-
-    while (!leftValue.done) {
+    for (const leftValue of leftGenerator) {
       const rightGenerator = evaluate(node.right, context)
-      let rightValue = rightGenerator.next();
-      while (!rightValue.done) {
-        const error = rttc.checkBinaryExpression(node, node.operator, leftValue.value, rightValue.value)
+      for (const rightValue of rightGenerator) {
+        const error = rttc.checkBinaryExpression(node, node.operator, leftValue, rightValue)
         if (error) {
           return handleRuntimeError(context, error)
         }
-        yield evaluateBinaryExpression(node.operator, leftValue.value, rightValue.value)
-        rightValue = rightGenerator.next();
+        yield evaluateBinaryExpression(node.operator, leftValue, rightValue)
       }
-
-      leftValue = leftGenerator.next();
     }
     return
   },
