@@ -465,12 +465,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const constant = node.kind === 'const'
     const id = declaration.id as es.Identifier
     const valueGenerator = evaluate(declaration.init!, context)
-    let value = valueGenerator.next()
-
-    while(!value.done) {
-      defineVariable(context, id.name, value.value, constant)
-      yield "Declared variable " + id.name + " with value " + value.value
-      value = valueGenerator.next()
+    for (const value of valueGenerator) {
+      defineVariable(context, id.name, value, constant)
+      yield value
     }
     return undefined
   },
