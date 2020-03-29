@@ -255,15 +255,12 @@ function* reduceIf(
   context: Context
 ): IterableIterator<es.Node> {
   const testGenerator = evaluate(node.test, context)
-  let test = testGenerator.next()
-  while (!test.done) {
-    const error = rttc.checkIfStatement(node, test.value)
+  for (const test of testGenerator) {
+    const error = rttc.checkIfStatement(node, test)
     if (error) {
       return handleRuntimeError(context, error)
     }
-    yield test.value ? node.consequent : node.alternate!
-
-    test = testGenerator.next()
+    yield test ? node.consequent : node.alternate!
   }
 }
 
