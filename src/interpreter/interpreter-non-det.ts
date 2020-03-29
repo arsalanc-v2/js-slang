@@ -203,12 +203,10 @@ function* cartesianProduct(
   } else {
     const currentNode = nodes.shift()! // we need the postfix ! to tell compiler that nodes array is nonempty
     const nodeValueGenerator = evaluate(currentNode, context)
-    let nodeValue = nodeValueGenerator.next()
-    while (!nodeValue.done) {
-      nodeValues.push(nodeValue.value)
+    for(const nodeValue of nodeValueGenerator) {
+      nodeValues.push(nodeValue)
       yield* cartesianProduct(context, nodes, nodeValues)
       nodeValues.pop()
-      nodeValue = nodeValueGenerator.next()
     }
     nodes.unshift(currentNode)
   }
@@ -284,15 +282,14 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     yield* sequenceValGenerator
   } else {
     sequence.shift()
-    let sequenceValue = sequenceValGenerator.next()
+    let shouldUnshift
+    for (const sequenceValue of sequenceValGenerator) {
 
-    // prevent unshifting of cut operator
-    let shouldUnshift = sequenceValue.value !== CUT
+      // prevent unshifting of cut operator
+      shouldUnshift = sequenceValue !== CUT
 
-    while (!sequenceValue.done) {
-      if (sequenceValue.value instanceof ReturnValue) {
-        yield sequenceValue.value
-        sequenceValue = sequenceValGenerator.next()
+      if (sequenceValue instanceof ReturnValue) {
+        yield sequenceValue
         continue
       }
 
@@ -302,8 +299,6 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
         shouldUnshift = false
         break
       }
-
-      sequenceValue = sequenceValGenerator.next()
     }
 
     if (shouldUnshift) sequence.unshift(firstStatement)
@@ -383,17 +378,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
 
     const calleeGenerator = evaluate(node.callee, context)
-    let calleeValue = calleeGenerator.next()
-    while (!calleeValue.done) {
+    for (const calleeValue of calleeGenerator) {
       const argsGenerator = getArgs(context, node)
-      let args = argsGenerator.next()
-      const thisContext = undefined;
-
-      while(!args.done) {
-        yield* apply(context, calleeValue.value, args.value, node, thisContext)
-        args = argsGenerator.next();
+      for(const args of argsGenerator) {
+        const thisContext = undefined;
+        yield* apply(context, calleeValue, args, node, thisContext)
       }
-      calleeValue = calleeGenerator.next();
     }
   },
 
