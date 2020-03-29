@@ -596,14 +596,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     const returnExpression = node.argument!
-
     const returnValueGenerator = evaluate(returnExpression, context)
-    let returnValue = returnValueGenerator.next()
-    while(!returnValue.done) {
-      yield new ReturnValue(returnValue.value)
-      returnValue = returnValueGenerator.next()
+    for (const returnValue of returnValueGenerator) {
+      yield new ReturnValue(returnValue)
     }
-
   },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
