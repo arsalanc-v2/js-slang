@@ -372,8 +372,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     for (const calleeValue of calleeGenerator) {
       const argsGenerator = getArgs(context, node)
       for(const args of argsGenerator) {
-        const thisContext = undefined;
-        yield* apply(context, calleeValue, args, node, thisContext)
+        yield* apply(context, calleeValue, args, node, undefined)
       }
     }
   },
