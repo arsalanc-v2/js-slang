@@ -252,15 +252,12 @@ function* reduceIf(
   context: Context
 ): IterableIterator<es.Node> {
   const testGenerator = evaluate(node.test, context)
-  let test = testGenerator.next()
-  while (!test.done) {
-    const error = rttc.checkIfStatement(node, test.value)
+  for (const test of testGenerator) {
+    const error = rttc.checkIfStatement(node, test)
     if (error) {
       return handleRuntimeError(context, error)
     }
-    yield test.value ? node.consequent : node.alternate!
-
-    test = testGenerator.next()
+    yield test ? node.consequent : node.alternate!
   }
 }
 
@@ -310,10 +307,8 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
 
 function* evaluateConditional(node: es.IfStatement | es.ConditionalExpression, context: Context) {
   const branchGenerator = reduceIf(node, context)
-  let branch = branchGenerator.next()
-  while (!branch.done) {
-    yield* evaluate(branch.value, context)
-    branch = branchGenerator.next()
+  for (const branch of branchGenerator) {
+    yield* evaluate(branch, context)
   }
 }
 
