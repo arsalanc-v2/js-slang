@@ -203,7 +203,7 @@ function* cartesianProduct(
   } else {
     const currentNode = nodes.shift()! // we need the postfix ! to tell compiler that nodes array is nonempty
     const nodeValueGenerator = evaluate(currentNode, context)
-    for(const nodeValue of nodeValueGenerator) {
+    for (const nodeValue of nodeValueGenerator) {
       nodeValues.push(nodeValue)
       yield* cartesianProduct(context, nodes, nodeValues)
       nodeValues.pop()
@@ -282,9 +282,8 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     yield* sequenceValGenerator
   } else {
     sequence.shift()
-    let shouldUnshift
+    let shouldUnshift = true
     for (const sequenceValue of sequenceValGenerator) {
-
       // prevent unshifting of cut operator
       shouldUnshift = sequenceValue !== CUT
 
