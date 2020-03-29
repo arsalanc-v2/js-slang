@@ -560,12 +560,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const id = node.left as es.Identifier
 
     const valueGenerator = evaluate(node.right, context)
-    let value = valueGenerator.next()
-    while (!value.done) {
-      setVariable(context, id.name, value.value)
-      yield value.value
-
-      value = valueGenerator.next()
+    for (const value of valueGenerator) {
+      setVariable(context, id.name, value)
+      yield value
     }
   },
 
