@@ -203,12 +203,10 @@ function* cartesianProduct(
   } else {
     const currentNode = nodes.shift()! // we need the postfix ! to tell compiler that nodes array is nonempty
     const nodeValueGenerator = evaluate(currentNode, context)
-    let nodeValue = nodeValueGenerator.next()
-    while (!nodeValue.done) {
-      nodeValues.push(nodeValue.value)
+    for (const nodeValue of nodeValueGenerator) {
+      nodeValues.push(nodeValue)
       yield* cartesianProduct(context, nodes, nodeValues)
       nodeValues.pop()
-      nodeValue = nodeValueGenerator.next()
     }
     nodes.unshift(currentNode)
   }
@@ -383,17 +381,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
 
     const calleeGenerator = evaluate(node.callee, context)
-    let calleeValue = calleeGenerator.next()
-    while (!calleeValue.done) {
+    for (const calleeValue of calleeGenerator) {
       const argsGenerator = getArgs(context, node)
-      let args = argsGenerator.next()
-      const thisContext = undefined;
-
-      while(!args.done) {
-        yield* apply(context, calleeValue.value, args.value, node, thisContext)
-        args = argsGenerator.next();
+      for(const args of argsGenerator) {
+        const thisContext = undefined;
+        yield* apply(context, calleeValue, args, node, thisContext)
       }
-      calleeValue = calleeGenerator.next();
     }
   },
 
