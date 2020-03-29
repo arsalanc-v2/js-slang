@@ -203,12 +203,10 @@ function* cartesianProduct(
   } else {
     const currentNode = nodes.shift()! // we need the postfix ! to tell compiler that nodes array is nonempty
     const nodeValueGenerator = evaluate(currentNode, context)
-    let nodeValue = nodeValueGenerator.next()
-    while (!nodeValue.done) {
-      nodeValues.push(nodeValue.value)
+    for (const nodeValue of nodeValueGenerator) {
+      nodeValues.push(nodeValue)
       yield* cartesianProduct(context, nodes, nodeValues)
       nodeValues.pop()
-      nodeValue = nodeValueGenerator.next()
     }
     nodes.unshift(currentNode)
   }
@@ -240,13 +238,10 @@ function* evaluateRequire(context: Context, call: es.CallExpression) {
 
   const predicate = call.arguments[0]
   const predicateGenerator = evaluate(predicate, context)
-  let predicateValue = predicateGenerator.next()
-
-  while (!predicateValue.done) {
-    if (predicateValue.value) {
+  for (const predicateValue of predicateGenerator) {
+    if (predicateValue) {
       yield 'Satisfied require'
     }
-    predicateValue = predicateGenerator.next()
   }
 }
 
@@ -255,15 +250,12 @@ function* reduceIf(
   context: Context
 ): IterableIterator<es.Node> {
   const testGenerator = evaluate(node.test, context)
-  let test = testGenerator.next()
-  while (!test.done) {
-    const error = rttc.checkIfStatement(node, test.value)
+  for (const test of testGenerator) {
+    const error = rttc.checkIfStatement(node, test)
     if (error) {
       return handleRuntimeError(context, error)
     }
-    yield test.value ? node.consequent : node.alternate!
-
-    test = testGenerator.next()
+    yield test ? node.consequent : node.alternate!
   }
 }
 
@@ -284,15 +276,13 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
     yield* sequenceValGenerator
   } else {
     sequence.shift()
-    let sequenceValue = sequenceValGenerator.next()
+    let shouldUnshift = true
+    for (const sequenceValue of sequenceValGenerator) {
+      // prevent unshifting of cut operator
+      shouldUnshift = sequenceValue !== CUT
 
-    // prevent unshifting of cut operator
-    let shouldUnshift = sequenceValue.value !== CUT
-
-    while (!sequenceValue.done) {
-      if (sequenceValue.value instanceof ReturnValue) {
-        yield sequenceValue.value
-        sequenceValue = sequenceValGenerator.next()
+      if (sequenceValue instanceof ReturnValue) {
+        yield sequenceValue
         continue
       }
 
@@ -302,8 +292,6 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
         shouldUnshift = false
         break
       }
-
-      sequenceValue = sequenceValGenerator.next()
     }
 
     if (shouldUnshift) sequence.unshift(firstStatement)
@@ -313,10 +301,8 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
 
 function* evaluateConditional(node: es.IfStatement | es.ConditionalExpression, context: Context) {
   const branchGenerator = reduceIf(node, context)
-  let branch = branchGenerator.next()
-  while (!branch.done) {
-    yield* evaluate(branch.value, context)
-    branch = branchGenerator.next()
+  for (const branch of branchGenerator) {
+    yield* evaluate(branch, context)
   }
 }
 
@@ -383,17 +369,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
 
     const calleeGenerator = evaluate(node.callee, context)
-    let calleeValue = calleeGenerator.next()
-    while (!calleeValue.done) {
+    for (const calleeValue of calleeGenerator) {
       const argsGenerator = getArgs(context, node)
-      let args = argsGenerator.next()
-      const thisContext = undefined;
-
-      while(!args.done) {
-        yield* apply(context, calleeValue.value, args.value, node, thisContext)
-        args = argsGenerator.next();
+      for(const args of argsGenerator) {
+        yield* apply(context, calleeValue, args, node, undefined)
       }
-      calleeValue = calleeGenerator.next();
     }
   },
 
@@ -416,37 +396,27 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function*(node: es.UnaryExpression, context: Context) {
     const argGenerator = evaluate(node.argument, context)
-    let argValue = argGenerator.next()
-
-    while (!argValue.done) {
-      const error = rttc.checkUnaryExpression(node, node.operator, argValue.value)
+    for (const argValue of argGenerator) {
+      const error = rttc.checkUnaryExpression(node, node.operator, argValue)
       if (error) {
         return handleRuntimeError(context, error)
       }
-
-      yield evaluateUnaryExpression(node.operator, argValue.value)
-      argValue = argGenerator.next()
+      yield evaluateUnaryExpression(node.operator, argValue)
     }
     return
   },
 
   BinaryExpression: function*(node: es.BinaryExpression, context: Context) {
     const leftGenerator = evaluate(node.left, context)
-    let leftValue = leftGenerator.next();
-
-    while (!leftValue.done) {
+    for (const leftValue of leftGenerator) {
       const rightGenerator = evaluate(node.right, context)
-      let rightValue = rightGenerator.next();
-      while (!rightValue.done) {
-        const error = rttc.checkBinaryExpression(node, node.operator, leftValue.value, rightValue.value)
+      for (const rightValue of rightGenerator) {
+        const error = rttc.checkBinaryExpression(node, node.operator, leftValue, rightValue)
         if (error) {
           return handleRuntimeError(context, error)
         }
-        yield evaluateBinaryExpression(node.operator, leftValue.value, rightValue.value)
-        rightValue = rightGenerator.next();
+        yield evaluateBinaryExpression(node.operator, leftValue, rightValue)
       }
-
-      leftValue = leftGenerator.next();
     }
     return
   },
@@ -465,12 +435,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const constant = node.kind === 'const'
     const id = declaration.id as es.Identifier
     const valueGenerator = evaluate(declaration.init!, context)
-    let value = valueGenerator.next()
-
-    while(!value.done) {
-      defineVariable(context, id.name, value.value, constant)
-      yield "Declared variable " + id.name + " with value " + value.value
-      value = valueGenerator.next()
+    for (const value of valueGenerator) {
+      defineVariable(context, id.name, value, constant)
+      yield value
     }
     return undefined
   },
@@ -571,12 +538,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const id = node.left as es.Identifier
 
     const valueGenerator = evaluate(node.right, context)
-    let value = valueGenerator.next()
-    while (!value.done) {
-      setVariable(context, id.name, value.value)
-      yield value.value
-
-      value = valueGenerator.next()
+    for (const value of valueGenerator) {
+      setVariable(context, id.name, value)
+      yield value
     }
   },
 
@@ -599,14 +563,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     const returnExpression = node.argument!
-
     const returnValueGenerator = evaluate(returnExpression, context)
-    let returnValue = returnValueGenerator.next()
-    while(!returnValue.done) {
-      yield new ReturnValue(returnValue.value)
-      returnValue = returnValueGenerator.next()
+    for (const returnValue of returnValueGenerator) {
+      yield new ReturnValue(returnValue)
     }
-
   },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
