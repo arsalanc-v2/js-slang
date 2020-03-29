@@ -240,13 +240,10 @@ function* evaluateRequire(context: Context, call: es.CallExpression) {
 
   const predicate = call.arguments[0]
   const predicateGenerator = evaluate(predicate, context)
-  let predicateValue = predicateGenerator.next()
-
-  while (!predicateValue.done) {
-    if (predicateValue.value) {
+  for (const predicateValue of predicateGenerator) {
+    if (predicateValue) {
       yield 'Satisfied require'
     }
-    predicateValue = predicateGenerator.next()
   }
 }
 
