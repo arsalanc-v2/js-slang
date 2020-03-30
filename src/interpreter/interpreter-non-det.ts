@@ -437,14 +437,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   BlockStatement: function*(node: es.BlockStatement, context: Context) {
     // Create a new environment (block scoping)
-    let environment = createBlockEnvironment(context, 'blockEnvironment')
+    const environment = createBlockEnvironment(context, 'blockEnvironment')
     pushEnvironment(context, environment)
-    const resultGenerator = evaluateBlockSatement(context, node)
 
+    const resultGenerator = evaluateBlockSatement(context, node)
     for (const result of resultGenerator) {
       popEnvironment(context)
       yield result
-      environment = createBlockEnvironment(context, 'blockEnvironment')
       pushEnvironment(context, environment)
     }
     popEnvironment(context)
