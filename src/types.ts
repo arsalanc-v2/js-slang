@@ -146,6 +146,7 @@ export interface Environment {
 
 export interface Error {
   status: 'error'
+  message?: SourceError
 }
 
 export interface Finished {
