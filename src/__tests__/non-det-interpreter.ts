@@ -300,7 +300,11 @@ const nonDetTestOptions = {
   executionMethod: 'interpreter'
 } as Partial<IOptions>
 
-export async function testDeterministicCode(code: string, expectedValue: any, hasError?: boolean) {
+export async function testDeterministicCode(
+  code: string,
+  expectedValue: any,
+  hasError: boolean = false
+) {
   /* a deterministic program is equivalent to a non deterministic program
      that returns a single value */
   await testNonDeterministicCode(code, [expectedValue], hasError)
@@ -310,7 +314,7 @@ export async function testDeterministicCode(code: string, expectedValue: any, ha
 export async function testNonDeterministicCode(
   code: string,
   expectedValues: any[],
-  hasError?: boolean
+  hasError: boolean = false
 ) {
   const context = makeNonDetContext()
   let result: Result = await runInContext(code, context, nonDetTestOptions)
