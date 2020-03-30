@@ -18,6 +18,10 @@ test('Unary operations with non deterministic terms', async () => {
   await testNonDeterministicCode('!amb(true, false);', [false, true])
 })
 
+test('Unary operations on the wrong type should cause error', async () => {
+  await testDeterministicCode('!100;', 'Line 1: Expected boolean, got number.', true)
+})
+
 test('Binary operations', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
   await testDeterministicCode('"hello" + " world" + "!";', 'hello world!')
@@ -31,6 +35,14 @@ test('Binary operations with non deterministic terms', async () => {
     'bye world!'
   ])
   await testNonDeterministicCode('amb((23 % 3), 7) * amb((10 / 2), 19 - 5);', [10, 28, 35, 98])
+})
+
+test('Binary operations on the wrong types should cause error', async () => {
+  await testDeterministicCode(
+    'false + 4;',
+    'Line 1: Expected string or number on left hand side of operation, got boolean.',
+    true
+  )
 })
 
 test('Assignment', async () => {
@@ -78,6 +90,14 @@ test('If-else and conditional expressions with non deterministic terms', async (
       9 * 10 / 5;
     }`,
     [18, 5, 'world', 'hello', false]
+  )
+})
+
+test('Conditional expression with non boolean predicate should cause error', async () => {
+  await testDeterministicCode(
+    '100 ? 5 : 5;',
+    'Line 1: Expected boolean as condition, got number.',
+    true
   )
 })
 
