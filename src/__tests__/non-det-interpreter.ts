@@ -48,6 +48,18 @@ test('Assignment with non deterministic terms', async () => {
   )
 })
 
+test('Re-assignment to constant should cause error', async () => {
+  await testDeterministicCode(
+    `const f = 10; { f = 20; }`,
+    'Line 1: Cannot assign new value to constant f.',
+    true
+  )
+})
+
+test('Accessing un-declared variable should cause error', async () => {
+  await testDeterministicCode(`let g = 100; f;`, 'Line -1: Name f not declared.', true)
+})
+
 test('If-else and conditional expressions with non deterministic terms', async () => {
   await testNonDeterministicCode('amb(false, true) ? 4 - 10 : 6;', [6, -6])
   await testNonDeterministicCode(
@@ -116,6 +128,18 @@ test('Function applications', async () => {
        reverse(list(1));
      }`,
     undefined
+  )
+})
+
+test('Applying functions with wrong number of arguments should cause error', async () => {
+  await testDeterministicCode(
+    `function foo(a, b) {
+       return a + b;
+     }
+     foo(1);
+     `,
+    `Line 4: Expected 2 arguments, but got 1.`,
+    true
   )
 })
 
