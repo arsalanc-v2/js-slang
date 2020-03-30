@@ -1,7 +1,7 @@
 /* tslint:disable:max-line-length */
 import { runInContext, resume, IOptions, Result, parseError } from '../index'
 import { mockContext } from '../mocks/context'
-import { SuspendedNonDet, Finished, Error, SourceError } from '../types'
+import { SuspendedNonDet, Finished } from '../types'
 
 test('Empty code returns undefined', async () => {
   await testDeterministicCode('', undefined)
@@ -329,7 +329,7 @@ export async function testNonDeterministicCode(
     expect((result as Finished).value).toEqual(undefined)
   } else {
     expect(result.status).toEqual('error')
-    const message: string = parseError([(result as Error).message as SourceError])
+    const message: string = parseError(context.errors)
     expect(message).toEqual(expectedValues[expectedValues.length - 1])
   }
 }

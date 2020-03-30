@@ -52,7 +52,7 @@ export class NonDetScheduler implements Scheduler {
           } as Result)
         }
       } catch (e) {
-        resolve({ status: 'error', message: e })
+        resolve({ status: 'error' })
       } finally {
         context.runtime.isRunning = false
       }
