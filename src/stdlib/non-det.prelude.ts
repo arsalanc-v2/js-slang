@@ -3,7 +3,6 @@ export const nonDetPrelude = `
         return predicate ? "Satisfied require" : amb();
     }
 
-
     /* DISTINCT */
     /* The distinct function checks whether the items in a list are unique. */
     /* Taken from SICP JS section 4.3.2 */
