@@ -155,7 +155,6 @@ test('Function applications', async () => {
      }`,
     undefined
   )
-
   await testDeterministicCode(`const a = 2; a();`, 'Line 1: Calling non-function value 2.', true)
 
   await testDeterministicCode(
@@ -379,7 +378,25 @@ test('Block statements', async () => {
     true
   )
 })
+test('Material Conditional', async () => {
+  await testDeterministicCode(`implication(true, true);`, true)
 
+  await testDeterministicCode(`implication(true, false);`, false)
+
+  await testDeterministicCode(`implication(false, true);`, true)
+
+  await testDeterministicCode(`implication(false, false);`, true)
+})
+
+test('Material Biconditional', async () => {
+  await testDeterministicCode(`bi_implication(true, true);`, true)
+
+  await testDeterministicCode(`bi_implication(true, false);`, false)
+
+  await testDeterministicCode(`bi_implication(false, true);`, false)
+
+  await testDeterministicCode(`bi_implication(false, false);`, true)
+})
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
