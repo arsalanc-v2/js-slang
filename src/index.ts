@@ -36,7 +36,7 @@ import { compileWithPrelude } from './vm/svml-compiler'
 import { runWithProgram } from './vm/svml-machine'
 
 export interface IOptions {
-  scheduler: 'preemptive' | 'async' | 'non-det'
+  scheduler: 'preemptive' | 'async'
   steps: number
   executionMethod: ExecutionMethod
   evaluationMethod: EvaluationMethod
