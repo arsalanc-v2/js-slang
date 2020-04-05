@@ -385,7 +385,12 @@ test('Test ambR application', async () => {
 
   await testNonDeterministicCode('ambR(1, 2, 3, 4, 5);', [1, 2, 3, 4, 5], false, true)
 
-  await testNonDeterministicCode('ambR(ambR(4, 5, 6, 7), ambR(3, 8));', [4, 5, 6, 7, 3, 8], false, true)
+  await testNonDeterministicCode(
+    'ambR(ambR(4, 5, 6, 7), ambR(3, 8));',
+    [4, 5, 6, 7, 3, 8],
+    false,
+    true
+  )
 })
 
 // ---------------------------------- Helper functions  -------------------------------------------
@@ -435,13 +440,13 @@ export async function testNonDeterministicCode(
     handlePostError(result, expectedValues, context)
     return
   }
-   
+
   handlePost(result)
 }
 
 /* Checks the final result obtained for a test
  * Assumes the test is not erroneous
-*/
+ */
 function handlePost(result: Result) {
   // all non deterministic programs have a final result whose value is undefined
   expect(result.status).toEqual('finished')
@@ -450,7 +455,7 @@ function handlePost(result: Result) {
 
 /* Checks the final result obtained for a test
  * Assumes the test is erroneous
-*/
+ */
 function handlePostError(result: Result, expectedValues: any[], context: Context) {
   expect(result.status).toEqual('error')
   const message: string = parseError(context.errors)
@@ -459,7 +464,7 @@ function handlePostError(result: Result, expectedValues: any[], context: Context
 
 /* Compares expected and obtained results after a test is run
  * Operates assuming the test involves randomization
-*/
+ */
 function handlePostRandom(results: any[], expectedValues: any[]) {
   results.sort()
   expectedValues.sort()
