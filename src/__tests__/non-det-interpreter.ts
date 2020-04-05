@@ -419,7 +419,7 @@ export async function testNonDeterministicCode(
   const context: Context = makeNonDetContext()
   let result: Result = await runInContext(code, context, nonDetTestOptions)
 
-  let results: any[] = []
+  const results: any[] = []
   const numOfRuns = hasError ? expectedValues.length - 1 : expectedValues.length
   for (let i = 0; i < numOfRuns; i++) {
     if (random) {

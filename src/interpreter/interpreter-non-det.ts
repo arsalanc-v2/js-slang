@@ -179,8 +179,6 @@ const checkNumberOfArguments = (
  * Returns a random integer for a given interval (inclusive).
  */
 function randomInt(min: number, max: number): number {
-  console.assert(max >= min)
-
   return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
@@ -338,7 +336,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         return yield* getAmbArgs(context, node)
       } else if (callee.name === 'ambR') {
         return yield* getAmbRArgs(context, node)
-      } 
+      }
     }
 
     const calleeGenerator = evaluate(node.callee, context)
