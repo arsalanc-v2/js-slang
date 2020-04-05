@@ -14,7 +14,7 @@ import { findDeclarationNode, findIdentifierNode } from './finder'
 import { evaluate } from './interpreter/interpreter'
 import { parse, parseAt } from './parser/parser'
 import { AsyncScheduler, PreemptiveScheduler, NonDetScheduler } from './schedulers'
-import { getAllOccurrencesInScope, lookupDefinition, scopeVariables } from './scoped-vars'
+import { getAllOccurrencesInScopeHelper, getScopeHelper } from './scope-refactoring'
 import { areBreakpointsSet, setBreakpointAtLine } from './stdlib/inspector'
 import { getEvaluationSteps } from './stepper/stepper'
 import { sandboxedEval } from './transpiler/evalContainer'
@@ -32,6 +32,8 @@ import {
 import { nonDetEvaluate } from './interpreter/interpreter-non-det'
 import { locationDummyNode } from './utils/astCreator'
 import { validateAndAnnotate } from './validator/validator'
+import { compileWithPrelude } from './vm/svml-compiler'
+import { runWithProgram } from './vm/svml-machine'
 
 export interface IOptions {
   scheduler: 'preemptive' | 'async' | 'non-det'
@@ -174,6 +176,47 @@ export function findDeclaration(
   return declarationNode.loc
 }
 
+export function getScope(
+  code: string,
+  context: Context,
+  loc: { line: number; column: number }
+): SourceLocation[] {
+  const program = parse(code, context, true)
+  if (!program) {
+    return []
+  }
+  const identifierNode = findIdentifierNode(program, context, loc)
+  if (!identifierNode) {
+    return []
+  }
+  const declarationNode = findDeclarationNode(program, identifierNode)
+  if (!declarationNode || declarationNode.loc == null || identifierNode !== declarationNode) {
+    return []
+  }
+
+  return getScopeHelper(declarationNode.loc, program, identifierNode.name)
+}
+
+export function getAllOccurrencesInScope(
+  code: string,
+  context: Context,
+  loc: { line: number; column: number }
+): SourceLocation[] {
+  const program = parse(code, context, true)
+  if (!program) {
+    return []
+  }
+  const identifierNode = findIdentifierNode(program, context, loc)
+  if (!identifierNode) {
+    return []
+  }
+  const declarationNode = findDeclarationNode(program, identifierNode)
+  if (declarationNode == null || declarationNode.loc == null) {
+    return []
+  }
+  return getAllOccurrencesInScopeHelper(declarationNode.loc, program, identifierNode.name)
+}
+
 export async function runInContext(
   code: string,
   context: Context,
@@ -200,6 +243,27 @@ export async function runInContext(
   validateAndAnnotate(program as Program, context)
   if (context.errors.length > 0) {
     return resolvedErrorPromise
+  }
+  if (context.chapter === 3.4) {
+    if (previousCode === code) {
+      JSSLANG_PROPERTIES.maxExecTime *= JSSLANG_PROPERTIES.factorToIncreaseBy
+    } else {
+      JSSLANG_PROPERTIES.maxExecTime = theOptions.originalMaxExecTime
+    }
+    previousCode = code
+    try {
+      return Promise.resolve({
+        status: 'finished',
+        value: runWithProgram(compileWithPrelude(program, context), context)
+      } as Result)
+    } catch (error) {
+      if (error instanceof RuntimeSourceError || error instanceof ExceptionError) {
+        context.errors.push(error) // use ExceptionErrors for non Source Errors
+        return resolvedErrorPromise
+      }
+      context.errors.push(new ExceptionError(error, UNKNOWN_LOCATION))
+      return resolvedErrorPromise
+    }
   }
   if (options.useSubst) {
     const steps = getEvaluationSteps(program, context)
@@ -277,7 +341,7 @@ export async function runInContext(
   } else {
     let it = evaluate(program, context)
     let scheduler: Scheduler
-    if (theOptions.scheduler === 'non-det') {
+    if (context.variant === 'non-det') {
       it = nonDetEvaluate(program, context)
       scheduler = new NonDetScheduler()
     } else if (theOptions.scheduler === 'async') {
@@ -304,12 +368,4 @@ export function interrupt(context: Context) {
   context.errors.push(new InterruptedError(context.runtime.nodes[0]))
 }
 
-export {
-  createContext,
-  Context,
-  Result,
-  setBreakpointAtLine,
-  scopeVariables,
-  lookupDefinition,
-  getAllOccurrencesInScope
-}
+export { createContext, Context, Result, setBreakpointAtLine }

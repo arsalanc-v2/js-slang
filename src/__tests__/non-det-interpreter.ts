@@ -1,5 +1,5 @@
 /* tslint:disable:max-line-length */
-import { runInContext, resume, IOptions, Result } from '../index'
+import { runInContext, resume, IOptions, Result, parseError } from '../index'
 import { mockContext } from '../mocks/context'
 import { SuspendedNonDet, Finished } from '../types'
 
@@ -18,6 +18,10 @@ test('Unary operations with non deterministic terms', async () => {
   await testNonDeterministicCode('!amb(true, false);', [false, true])
 })
 
+test('Unary operations on the wrong type should cause error', async () => {
+  await testDeterministicCode('!100;', 'Line 1: Expected boolean, got number.', true)
+})
+
 test('Binary operations', async () => {
   await testDeterministicCode('1 + 4 - 10 * 5;', -45)
   await testDeterministicCode('"hello" + " world" + "!";', 'hello world!')
@@ -33,6 +37,14 @@ test('Binary operations with non deterministic terms', async () => {
   await testNonDeterministicCode('amb((23 % 3), 7) * amb((10 / 2), 19 - 5);', [10, 28, 35, 98])
 })
 
+test('Binary operations on the wrong types should cause error', async () => {
+  await testDeterministicCode(
+    'false + 4;',
+    'Line 1: Expected string or number on left hand side of operation, got boolean.',
+    true
+  )
+})
+
 test('Assignment', async () => {
   await testDeterministicCode('let a = 5; a = 10; a;', 10)
 })
@@ -46,6 +58,18 @@ test('Assignment with non deterministic terms', async () => {
     amb(reassign_num(), num);`,
     [10, 5]
   )
+})
+
+test('Re-assignment to constant should cause error', async () => {
+  await testDeterministicCode(
+    `const f = 10; { f = 20; }`,
+    'Line 1: Cannot assign new value to constant f.',
+    true
+  )
+})
+
+test('Accessing un-declared variable should cause error', async () => {
+  await testDeterministicCode(`let g = 100; f;`, 'Line -1: Name f not declared.', true)
 })
 
 test('If-else and conditional expressions with non deterministic terms', async () => {
@@ -66,6 +90,14 @@ test('If-else and conditional expressions with non deterministic terms', async (
       9 * 10 / 5;
     }`,
     [18, 5, 'world', 'hello', false]
+  )
+})
+
+test('Conditional expression with non boolean predicate should cause error', async () => {
+  await testDeterministicCode(
+    '100 ? 5 : 5;',
+    'Line 1: Expected boolean as condition, got number.',
+    true
   )
 })
 
@@ -95,6 +127,12 @@ test('Logical expressions with non deterministic terms', async () => {
 
 test('Function applications', async () => {
   await testDeterministicCode(
+    `function f() {} f();
+    `,
+    undefined
+  )
+
+  await testDeterministicCode(
     `function factorial(n) {
       return n === 0 ? 1 : n * factorial(n - 1);
      }
@@ -116,6 +154,35 @@ test('Function applications', async () => {
        reverse(list(1));
      }`,
     undefined
+  )
+
+  await testDeterministicCode(`const a = 2; a();`, 'Line 1: Calling non-function value 2.', true)
+
+  await testDeterministicCode(
+    `(function() {})();`,
+    'Line 1: Function expressions are not allowed',
+    true
+  )
+
+  await testDeterministicCode(
+    `function ignoreStatementsAfterReturn(n) {
+        return n; return n * 2;
+     }
+     ignoreStatementsAfterReturn(5);
+    `,
+    5
+  )
+})
+
+test('Applying functions with wrong number of arguments should cause error', async () => {
+  await testDeterministicCode(
+    `function foo(a, b) {
+       return a + b;
+     }
+     foo(1);
+     `,
+    `Line 4: Expected 2 arguments, but got 1.`,
+    true
   )
 })
 
@@ -158,7 +225,7 @@ test('Empty amb application', async () => {
   await testNonDeterministicCode('amb();', [])
 })
 
-test('Test simple amb application', async () => {
+test('Simple amb application', async () => {
   await testNonDeterministicCode('amb(1, 4 + 5, 3 - 10);', [1, 9, -7])
 })
 
@@ -206,6 +273,111 @@ test('Require operator', async () => {
     ',
     [6, 9]
   )
+
+  await testNonDeterministicCode(
+    `const f = an_integer_between(1, 10); require(f > 3, true); f;`,
+    ['Line 1: Expected 1 arguments, but got 2.'],
+    true
+  )
+})
+
+test('Cut operator', async () => {
+  await testNonDeterministicCode(
+    `const f = amb(1, 2, 3); cut; f + amb(4, 5, 6);
+    `,
+    [5, 6, 7]
+  )
+
+  await testNonDeterministicCode(
+    `const f = amb(1, 2, 3);  const g = amb(4, 5, 6); cut; f + g;
+    `,
+    [5]
+  )
+})
+
+/*  Deterministic block scoping tests taken from block-scoping.ts */
+
+test('Block statements', async () => {
+  await testDeterministicCode(
+    `
+    function test(){
+      const x = true;
+      {
+          const x = false;
+      }
+      return x;
+    }
+    test();
+    `,
+    true
+  )
+
+  await testDeterministicCode(
+    `
+    function test(){
+      let x = true;
+      if(true) {
+          let x = false;
+      } else {
+          let x = false;
+      }
+      return x;
+    }
+    test();
+    `,
+    true
+  )
+
+  await testDeterministicCode(
+    `
+    const v = f();
+    function f() {
+      return 1;
+    }
+    v;
+    `,
+    'Line -1: Name f declared later in current scope but not yet assigned',
+    true
+  )
+
+  await testDeterministicCode(
+    `
+    const a = 1;
+    function f() {
+      display(a);
+      const a = 5;
+    }
+    f();
+    `,
+    'Line -1: Name a declared later in current scope but not yet assigned',
+    true
+  )
+
+  await testDeterministicCode(
+    `
+    const a = 1;
+    {
+      a + a;
+      const a = 10;
+    }
+    `,
+    'Line -1: Name a declared later in current scope but not yet assigned',
+    true
+  )
+
+  await testDeterministicCode(
+    `
+    let variable = 1;
+    function test(){
+      variable = 100;
+      let variable = true;
+      return variable;
+    }
+    test();
+    `,
+    'Line -1: Name variable not declared.',
+    true
+  )
 })
 
 test('Array access', async () => {
@@ -233,33 +405,49 @@ test('Non-deterministic arrays', async () => {
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
-  scheduler: 'non-det',
   executionMethod: 'interpreter'
 } as Partial<IOptions>
 
-export async function testDeterministicCode(code: string, expectedValue: any) {
+export async function testDeterministicCode(
+  code: string,
+  expectedValue: any,
+  hasError: boolean = false
+) {
   /* a deterministic program is equivalent to a non deterministic program
      that returns a single value */
-  await testNonDeterministicCode(code, [expectedValue])
+  await testNonDeterministicCode(code, [expectedValue], hasError)
 }
 
-export async function testNonDeterministicCode(code: string, expectedValues: any[]) {
+/* Assumes the error message (if any) is at the last index of expectedValues */
+export async function testNonDeterministicCode(
+  code: string,
+  expectedValues: any[],
+  hasError: boolean = false
+) {
   const context = makeNonDetContext()
   let result: Result = await runInContext(code, context, nonDetTestOptions)
-  const numOfRuns = expectedValues.length
+
+  const numOfRuns = hasError ? expectedValues.length - 1 : expectedValues.length
   for (let i = 0; i < numOfRuns; i++) {
     expect((result as SuspendedNonDet).value).toEqual(expectedValues[i])
     expect(result.status).toEqual('suspended-non-det')
+
     result = await resume(result)
   }
 
-  // all non deterministic programs have a final result whose value is undefined
-  expect(result.status).toEqual('finished')
-  expect((result as Finished).value).toEqual(undefined)
+  if (!hasError) {
+    // all non deterministic programs have a final result whose value is undefined
+    expect(result.status).toEqual('finished')
+    expect((result as Finished).value).toEqual(undefined)
+  } else {
+    expect(result.status).toEqual('error')
+    const message: string = parseError(context.errors)
+    expect(message).toEqual(expectedValues[expectedValues.length - 1])
+  }
 }
 
 function makeNonDetContext() {
-  const context = mockContext(4.3)
+  const context = mockContext(3, 'non-det')
   context.executionMethod = 'interpreter'
   return context
 }

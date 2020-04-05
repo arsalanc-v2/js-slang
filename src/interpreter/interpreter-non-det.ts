@@ -59,9 +59,9 @@ const handleRuntimeError = (context: Context, error: RuntimeSourceError): never 
   throw error
 }
 
-const HOISTED_BUT_NOT_YET_ASSIGNED = Symbol('Used to implement hoisting')
+const DECLARED_BUT_NOT_YET_ASSIGNED = Symbol('Used to implement declaration')
 
-function hoistIdentifier(context: Context, name: string, node: es.Node) {
+function declareIdentifier(context: Context, name: string, node: es.Node) {
   const environment = currentEnvironment(context)
   if (environment.head.hasOwnProperty(name)) {
     const descriptors = Object.getOwnPropertyDescriptors(environment.head)
@@ -71,27 +71,24 @@ function hoistIdentifier(context: Context, name: string, node: es.Node) {
       new errors.VariableRedeclaration(node, name, descriptors[name].writable)
     )
   }
-  environment.head[name] = HOISTED_BUT_NOT_YET_ASSIGNED
+  environment.head[name] = DECLARED_BUT_NOT_YET_ASSIGNED
   return environment
 }
 
-function hoistVariableDeclarations(context: Context, node: es.VariableDeclaration) {
+function declareVariables(context: Context, node: es.VariableDeclaration) {
   for (const declaration of node.declarations) {
-    hoistIdentifier(context, (declaration.id as es.Identifier).name, node)
+    declareIdentifier(context, (declaration.id as es.Identifier).name, node)
   }
 }
 
-function hoistFunctionsAndVariableDeclarationsIdentifiers(
-  context: Context,
-  node: es.BlockStatement
-) {
+function declareFunctionAndVariableIdentifiers(context: Context, node: es.BlockStatement) {
   for (const statement of node.body) {
     switch (statement.type) {
       case 'VariableDeclaration':
-        hoistVariableDeclarations(context, statement)
+        declareVariables(context, statement)
         break
       case 'FunctionDeclaration':
-        hoistIdentifier(context, (statement.id as es.Identifier).name, statement)
+        declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
     }
   }
@@ -100,7 +97,7 @@ function hoistFunctionsAndVariableDeclarationsIdentifiers(
 function defineVariable(context: Context, name: string, value: Value, constant = false) {
   const environment = context.runtime.environments[0]
 
-  if (environment.head[name] !== HOISTED_BUT_NOT_YET_ASSIGNED) {
+  if (environment.head[name] !== DECLARED_BUT_NOT_YET_ASSIGNED) {
     return handleRuntimeError(
       context,
       new errors.VariableRedeclaration(context.runtime.nodes[0]!, name, !constant)
@@ -125,7 +122,7 @@ const getVariable = (context: Context, name: string) => {
   let environment: Environment | null = context.runtime.environments[0]
   while (environment) {
     if (environment.head.hasOwnProperty(name)) {
-      if (environment.head[name] === HOISTED_BUT_NOT_YET_ASSIGNED) {
+      if (environment.head[name] === DECLARED_BUT_NOT_YET_ASSIGNED) {
         return handleRuntimeError(
           context,
           new errors.UnassignedVariable(name, context.runtime.nodes[0])
@@ -144,7 +141,7 @@ const setVariable = (context: Context, name: string, value: any) => {
   let environment: Environment | null = context.runtime.environments[0]
   while (environment) {
     if (environment.head.hasOwnProperty(name)) {
-      if (environment.head[name] === HOISTED_BUT_NOT_YET_ASSIGNED) {
+      if (environment.head[name] === DECLARED_BUT_NOT_YET_ASSIGNED) {
         break
       }
       const descriptors = Object.getOwnPropertyDescriptors(environment.head)
@@ -220,23 +217,6 @@ function transformLogicalExpression(node: es.LogicalExpression): es.ConditionalE
   }
 }
 
-function* evaluateRequire(context: Context, call: es.CallExpression) {
-  if (call.arguments.length !== 1) {
-    return yield handleRuntimeError(
-      context,
-      new errors.InvalidNumberOfArguments(call, 1, call.arguments.length)
-    )
-  }
-
-  const predicate = call.arguments[0]
-  const predicateGenerator = evaluate(predicate, context)
-  for (const predicateValue of predicateGenerator) {
-    if (predicateValue) {
-      yield 'Satisfied require'
-    }
-  }
-}
-
 function* reduceIf(
   node: es.IfStatement | es.ConditionalExpression,
   context: Context
@@ -254,7 +234,7 @@ function* reduceIf(
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
 
 function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
-  hoistFunctionsAndVariableDeclarationsIdentifiers(context, node)
+  declareFunctionAndVariableIdentifiers(context, node)
   yield* evaluateSequence(context, node.body)
 }
 
@@ -320,10 +300,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     yield* cartesianProduct(context, node.elements as es.Expression[], [])
   },
 
-  FunctionExpression: function*(node: es.FunctionExpression, context: Context) {
-    yield new Closure(node, currentEnvironment(context), context)
-  },
-
   ArrowFunctionExpression: function*(node: es.ArrowFunctionExpression, context: Context) {
     yield Closure.makeFromArrowFunction(node, currentEnvironment(context), context)
   },
@@ -339,12 +315,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   CallExpression: function*(node: es.CallExpression, context: Context) {
     const callee = node.callee;
-    if (rttc.isIdentifier(callee)) {
-      if (callee.name === 'amb') {
+    if (rttc.isIdentifier(callee) && callee.name === 'amb') {
         return yield* getAmbArgs(context, node)
-      } else if (callee.name === 'require') {
-        return yield* evaluateRequire(context, node)
-      }
     }
 
     let thisContext
@@ -519,14 +491,17 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   BlockStatement: function*(node: es.BlockStatement, context: Context) {
-    let result: Value
-
     // Create a new environment (block scoping)
     const environment = createBlockEnvironment(context, 'blockEnvironment')
     pushEnvironment(context, environment)
-    result = yield* evaluateBlockSatement(context, node)
+
+    const resultGenerator = evaluateBlockSatement(context, node)
+    for (const result of resultGenerator) {
+      popEnvironment(context)
+      yield result
+      pushEnvironment(context, environment)
+    }
     popEnvironment(context)
-    return result
   },
 
   Program: function*(node: es.BlockStatement, context: Context) {
@@ -550,17 +525,6 @@ export function* apply(
   node: es.CallExpression,
   thisContext?: Value
 ) {
-  // This function takes a value that may be a ReturnValue.
-  // If so, it returns the value wrapped in the ReturnValue.
-  // If not, it returns the default value.
-  function unwrapReturnValue(result: any, defaultValue: any) {
-    if (result instanceof ReturnValue) {
-      return result.value
-    } else {
-      return defaultValue
-    }
-  }
-
   if (fun instanceof Closure) {
     checkNumberOfArguments(context, fun, args, node!)
     const environment = createEnvironment(fun, args, node)
@@ -570,6 +534,18 @@ export function* apply(
       context,
       cloneDeep(fun.node.body) as es.BlockStatement
     )
+
+    // This function takes a value that may be a ReturnValue.
+    // If so, it returns the value wrapped in the ReturnValue.
+    // If not, it returns the default value.
+    function unwrapReturnValue(result: any, defaultValue: any) {
+      if (result instanceof ReturnValue) {
+        return result.value
+      } else {
+        return defaultValue
+      }
+    }
+
     for (const applicationValue of applicationValueGenerator) {
       popEnvironment(context)
       yield unwrapReturnValue(applicationValue, undefined)
