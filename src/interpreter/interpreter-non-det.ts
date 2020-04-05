@@ -392,8 +392,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {
     if (node.left.type === 'MemberExpression') {
-      const triplesGenerator = cartesianProduct(context, [node.right, node.left.property, node.left.object as es.Expression], [])
-      for (const triple of triplesGenerator) {
+      const tripleGenerator = cartesianProduct(context, [node.right, node.left.property, node.left.object as es.Expression], [])
+      for (const triple of tripleGenerator) {
         const val = triple[0]
         const prop = triple[1]
         const obj = triple[2]
