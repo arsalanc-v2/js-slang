@@ -300,6 +300,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     yield Closure.makeFromArrowFunction(node, currentEnvironment(context), context)
   },
 
+  ArrayExpression: function*(node: es.ArrayExpression, context: Context) {
+    yield* cartesianProduct(context, node.elements as es.Expression[], [])
+  },
+
   Identifier: function*(node: es.Identifier, context: Context) {
     if (node.name === 'cut') {
       return yield CUT
