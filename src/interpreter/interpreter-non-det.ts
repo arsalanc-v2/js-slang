@@ -11,6 +11,11 @@ import Closure from './closure'
 import { cloneDeep, assignIn } from 'lodash'
 import { CUT } from '../constants'
 
+
+class BreakValue {}
+
+class ContinueValue {}
+
 class ReturnValue {
   constructor(public value: Value) {}
 }
@@ -253,7 +258,7 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
       // prevent unshifting of cut operator
       shouldUnshift = sequenceValue !== CUT
 
-      if (sequenceValue instanceof ReturnValue) {
+      if (sequenceValue instanceof ReturnValue || sequenceValue instanceof BreakValue || sequenceValue instanceof ContinueValue) {
         yield sequenceValue
         continue
       }
@@ -380,7 +385,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const valueGenerator = evaluate(node.right, context)
     for (const value of valueGenerator) {
       setVariable(context, id.name, value)
-      yield value
+      yield value 
     }
   },
 
@@ -400,6 +405,40 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return yield* evaluate(node.expression, context)
   },
 
+  ContinueStatement: function*(node: es.ContinueStatement, context: Context) {
+    yield new ContinueValue()
+  },
+
+  BreakStatement: function*(node: es.BreakStatement, context: Context) {
+    yield new BreakValue()
+  },
+
+  WhileStatement: function*(node: es.WhileStatement, context: Context) {
+    let value: any // tslint:disable-line
+    function* loop(): any {
+      const testGenerator = evaluate(node.test, context)
+      for (const test of testGenerator) {
+        if (test &&
+          !(value instanceof ReturnValue) &&
+          !(value instanceof BreakValue)
+        ) {
+          const bodyGenerator = evaluate(cloneDeep(node.body), context)
+          for (const body of bodyGenerator) {
+            value = body
+            yield* loop();
+          }
+        } else {
+          if (value instanceof BreakValue || value instanceof ContinueValue) {
+            yield undefined
+          } else {
+            yield value
+          }
+        } 
+      }
+    }
+
+    yield* loop();
+  },
 
   ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
     const returnExpression = node.argument!
