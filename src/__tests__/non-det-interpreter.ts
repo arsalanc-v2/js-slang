@@ -393,8 +393,8 @@ test('Deterministic arrays', async () => {
   await testDeterministicCode(`const f = () => 2; const a = [1, f(), 3]; a;`, [1, 2, 3])
 
   await testDeterministicCode(
-    `[1, 1, 1]["str"];`,
-    'Line 1: Expected array index as prop, got string.',
+    `[1, 1, 1][4.4];`,
+    'Line 1: Expected array index as prop, got other number.',
     true
   )
 
