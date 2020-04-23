@@ -501,7 +501,19 @@ test('While loops', async () => {
       i = i - 1;
     }
     i;`, 'Line 3: Expected boolean as condition, got number.', true)
+})
 
+test('While loop body should use new environment', async () => {
+  await testDeterministicCode(`
+    let i = 2;
+    while (i > 0) {
+      i = i - 1;
+      let x = 5;
+    }
+    x;`, 'Line -1: Name x not declared.', true)
+})
+
+test('Nested while loops', async () => {
   await testDeterministicCode(`
     let count = 0;
     let i = 1;
