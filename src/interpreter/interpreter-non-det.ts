@@ -457,6 +457,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     function* loop(): any {
       const testGenerator = evaluate(node.test, context)
       for (const test of testGenerator) {
+        const error = rttc.checkIfStatement(node.test, test)
+        if (error) return handleRuntimeError(context, error)
+
         if (test &&
           !(value instanceof ReturnValue) &&
           !(value instanceof BreakValue)
