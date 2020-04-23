@@ -1,4 +1,4 @@
-import { simple } from 'acorn-walk/dist/walk'
+import { simple, findNodeAt } from 'acorn-walk/dist/walk'
 import { DebuggerStatement, Literal, Program, SourceLocation } from 'estree'
 import { RawSourceMap, SourceMapConsumer } from 'source-map'
 import { JSSLANG_PROPERTIES, UNKNOWN_LOCATION } from './constants'
@@ -12,34 +12,40 @@ import {
 import { RuntimeSourceError } from './errors/runtimeSourceError'
 import { findDeclarationNode, findIdentifierNode } from './finder'
 import { evaluate } from './interpreter/interpreter'
-import { parse, parseAt } from './parser/parser'
+import { parse, parseAt, parseForNames } from './parser/parser'
 import { AsyncScheduler, PreemptiveScheduler, NonDetScheduler } from './schedulers'
 import { getAllOccurrencesInScopeHelper, getScopeHelper } from './scope-refactoring'
 import { areBreakpointsSet, setBreakpointAtLine } from './stdlib/inspector'
-import { getEvaluationSteps } from './stepper/stepper'
+import { redexify, getEvaluationSteps } from './stepper/stepper'
 import { sandboxedEval } from './transpiler/evalContainer'
 import { transpile } from './transpiler/transpiler'
 import {
   Context,
   Error as ResultError,
-  EvaluationMethod,
   ExecutionMethod,
   Finished,
   Result,
   Scheduler,
-  SourceError
+  SourceError,
+  Variant,
+  TypeAnnotatedNode
 } from './types'
 import { nonDetEvaluate } from './interpreter/interpreter-non-det'
 import { locationDummyNode } from './utils/astCreator'
 import { validateAndAnnotate } from './validator/validator'
 import { compileWithPrelude } from './vm/svml-compiler'
 import { runWithProgram } from './vm/svml-machine'
+export { SourceDocumentation } from './editors/ace/docTooltip'
+import { getProgramNames, getKeywords } from './name-extractor'
+import * as es from 'estree'
+import { typeCheck } from './typeChecker/typeChecker'
+import { typeToString } from './utils/stringify'
 
 export interface IOptions {
   scheduler: 'preemptive' | 'async'
   steps: number
   executionMethod: ExecutionMethod
-  evaluationMethod: EvaluationMethod
+  variant: Variant
   originalMaxExecTime: number
   useSubst: boolean
 }
@@ -48,7 +54,7 @@ const DEFAULT_OPTIONS: IOptions = {
   scheduler: 'async',
   steps: 1000,
   executionMethod: 'auto',
-  evaluationMethod: 'strict',
+  variant: 'default',
   originalMaxExecTime: 1000,
   useSubst: false
 }
@@ -217,6 +223,110 @@ export function getAllOccurrencesInScope(
   return getAllOccurrencesInScopeHelper(declarationNode.loc, program, identifierNode.name)
 }
 
+export async function getNames(
+  code: string,
+  line: number,
+  col: number,
+  context: Context
+): Promise<any> {
+  const [program, comments] = parseForNames(code)
+
+  if (!program) {
+    return []
+  }
+  const cursorLoc: es.Position = { line, column: col }
+
+  const [progNames, displaySuggestions] = getProgramNames(program, comments, cursorLoc)
+  const keywords = getKeywords(program, cursorLoc, context)
+  return [progNames.concat(keywords), displaySuggestions]
+}
+
+function typedParse(code: any, context: Context) {
+  const program: Program | undefined = parse(code, context)
+  if (program === undefined) {
+    return null
+  }
+  return validateAndAnnotate(program, context)
+}
+
+export function getTypeInformation(
+  code: string,
+  context: Context,
+  loc: { line: number; column: number },
+  name: string
+): string {
+  const lineNumber = loc.line
+
+  // parse the program into typed nodes and parse error
+  const program = typedParse(code, context)
+  if (program === null) {
+    return ''
+  }
+  const [typedProgram, error] = typeCheck(program)
+  const parsedError = parseError(error)
+
+  // initialize the ans string
+  let ans = ''
+  if (parsedError) {
+    ans += parsedError + '\n'
+  }
+  if (!typedProgram) {
+    return ans
+  }
+
+  // callback function for findNodeAt function
+  function findByLocationPredicate(type: string, node: TypeAnnotatedNode<es.Node>) {
+    if (!node.inferredType) {
+      return false
+    }
+    const location = node.loc
+    const nodeType = node.type
+    if (nodeType && location) {
+      let id = ''
+      if (node.type === 'Identifier') {
+        id = node.name
+      } else if (node.type === 'FunctionDeclaration') {
+        id = node.id?.name!
+      } else if (node.type === 'VariableDeclaration') {
+        id = (node.declarations[0].id as es.Identifier).name
+      }
+      return id === name && location.start.line <= loc.line && location.end.line >= loc.line
+    }
+    return false
+  }
+
+  // report both as the type inference
+  return (
+    ans +
+    typedProgram.body
+      .map((node: TypeAnnotatedNode<es.Node>) => {
+        const res = findNodeAt(typedProgram, undefined, undefined, findByLocationPredicate)
+        if (res === undefined) {
+          return undefined
+        } else {
+          return res.node
+        }
+      })
+      .filter((node: TypeAnnotatedNode<es.Node>) => {
+        return node !== undefined
+      })
+      .map((node: TypeAnnotatedNode<es.Node>) => {
+        let id = ''
+        if (node.type === 'Identifier') {
+          id = node.name
+        } else if (node.type === 'FunctionDeclaration') {
+          id = node.id?.name!
+        } else if (node.type === 'VariableDeclaration') {
+          id = (node.declarations[0].id as es.Identifier).name
+        }
+        const type = typeToString(node.inferredType!)
+        return `At Line ${lineNumber} => ${id}: ${type}`
+      })
+      .slice(0, 1)
+      .join('\n')
+  )
+}
+
 export async function runInContext(
   code: string,
   context: Context,
@@ -232,7 +342,7 @@ export async function runInContext(
     return undefined
   }
   const theOptions: IOptions = { ...DEFAULT_OPTIONS, ...options }
-  context.evaluationMethod = theOptions.evaluationMethod
+  context.variant = determineVariant(context, options)
   context.errors = []
 
   verboseErrors = getFirstLine(code) === 'enable verbose'
@@ -244,7 +354,7 @@ export async function runInContext(
   if (context.errors.length > 0) {
     return resolvedErrorPromise
   }
-  if (context.chapter === 3.4) {
+  if (context.variant === 'concurrent') {
     if (previousCode === code) {
       JSSLANG_PROPERTIES.maxExecTime *= JSSLANG_PROPERTIES.factorToIncreaseBy
     } else {
@@ -267,9 +377,14 @@ export async function runInContext(
   }
   if (options.useSubst) {
     const steps = getEvaluationSteps(program, context)
+    const redexedSteps: [string, string, string][] = []
+    for (const step of steps) {
+      const redexed = redexify(step[0], step[1])
+      redexedSteps.push([redexed[0], redexed[1], step[2]])
+    }
     return Promise.resolve({
       status: 'finished',
-      value: steps
+      value: redexedSteps
     } as Result)
   }
   const isNativeRunnable = determineExecutionMethod(theOptions, context, program)
@@ -290,7 +405,7 @@ export async function runInContext(
     let sourceMapJson: RawSourceMap | undefined
     let lastStatementSourceMapJson: RawSourceMap | undefined
     try {
-      const temp = transpile(program, context.contextId, false, context.evaluationMethod)
+      const temp = transpile(program, context.contextId, false, context.variant)
       // some issues with formatting and semicolons and tslint so no destructure
       transpiled = temp.transpiled
       sourceMapJson = temp.codeMap
@@ -350,6 +465,26 @@ export async function runInContext(
       scheduler = new PreemptiveScheduler(theOptions.steps)
     }
     return scheduler.run(it, context)
+  }
+}
+
+/**
+ * Small function to determine the variant to be used
+ * by a program, as both context and options can have
+ * a variant. The variant provided in options will
+ * have precedence over the variant provided in context.
+ *
+ * @param context The context of the program.
+ * @param options Options to be used when
+ *                running the program.
+ *
+ * @returns The variant that the program is to be run in
+ */
+function determineVariant(context: Context, options: Partial<IOptions>): Variant {
+  if (options.variant) {
+    return options.variant
+  } else {
+    return context.variant
   }
 }
 

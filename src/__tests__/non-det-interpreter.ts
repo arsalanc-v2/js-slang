@@ -283,13 +283,13 @@ test('Require operator', async () => {
 
 test('Cut operator', async () => {
   await testNonDeterministicCode(
-    `const f = amb(1, 2, 3); cut; f + amb(4, 5, 6);
+    `const f = amb(1, 2, 3); cut(); f + amb(4, 5, 6);
     `,
     [5, 6, 7]
   )
 
   await testNonDeterministicCode(
-    `const f = amb(1, 2, 3);  const g = amb(4, 5, 6); cut; f + g;
+    `const f = amb(1, 2, 3);  const g = amb(4, 5, 6); cut(); f + g;
     `,
     [5]
   )
@@ -393,6 +393,98 @@ test('Test ambR application', async () => {
   )
 })
 
+test('Deterministic arrays', async () => {
+  await testDeterministicCode(`[];`, [])
+
+  await testDeterministicCode(`const a = [[1, 2], [3, [4]]]; a;`, [
+    [1, 2],
+    [3, [4]]
+  ])
+
+  await testDeterministicCode(`const a = [[[[6]]]]; a[0][0][0][0];`, 6)
+
+  await testDeterministicCode(`const f = () => 2; const a = [1, f(), 3]; a;`, [1, 2, 3])
+
+  await testDeterministicCode(
+    `[1, 1, 1][4.4];`,
+    'Line 1: Expected array index as prop, got other number.',
+    true
+  )
+
+  await testDeterministicCode(
+    `[1, 1, 1]["str"] = 2;`,
+    'Line 1: Expected array index as prop, got string.',
+    true
+  )
+
+  await testDeterministicCode(`4[0];`, 'Line 1: Expected object or array, got number.', true)
+})
+
+test('Non-deterministic array values', async () => {
+  await testNonDeterministicCode(`const a = [amb(1, 2), amb(3, 4)]; a;`, [
+    [1, 3],
+    [1, 4],
+    [2, 3],
+    [2, 4]
+  ])
+
+  await testNonDeterministicCode(`const a = [1, 2, 3, 4]; a[2] = amb(10, 11, 12); a;`, [
+    [1, 2, 10, 4],
+    [1, 2, 11, 4],
+    [1, 2, 12, 4]
+  ])
+})
+
+test('Non-deterministic array objects', async () => {
+  await testNonDeterministicCode(
+    `const a = [1, 2]; const b = [3, 4];
+     amb(a, b)[1] = 99; a;
+    `,
+    [
+      [1, 99],
+      [1, 2]
+    ]
+  )
+
+  await testNonDeterministicCode(
+    `const a = [1, 2]; const b = [3, 4];
+     amb(a, b)[1] = 99; b;
+    `,
+    [
+      [3, 4],
+      [3, 99]
+    ]
+  )
+})
+
+test('Non-deterministic array properties', async () => {
+  await testNonDeterministicCode(
+    `
+      const a = [100, 101, 102, 103];
+      a[amb(0, 1, 2, 3)] = 999; a;
+    `,
+    [
+      [999, 101, 102, 103],
+      [100, 999, 102, 103],
+      [100, 101, 999, 103],
+      [100, 101, 102, 999]
+    ]
+  )
+})
+
+test('Material Conditional', async () => {
+  await testDeterministicCode(`implication(true, true);`, true)
+  await testDeterministicCode(`implication(true, false);`, false)
+  await testDeterministicCode(`implication(false, true);`, true)
+  await testDeterministicCode(`implication(false, false);`, true)
+})
+
+test('Material Biconditional', async () => {
+  await testDeterministicCode(`bi_implication(true, true);`, true)
+  await testDeterministicCode(`bi_implication(true, false);`, false)
+  await testDeterministicCode(`bi_implication(false, true);`, false)
+  await testDeterministicCode(`bi_implication(false, false);`, true)
+})
 // ---------------------------------- Helper functions  -------------------------------------------
 
 const nonDetTestOptions = {
@@ -433,21 +525,21 @@ export async function testNonDeterministicCode(
   }
 
   if (random) {
-    handlePostRandom(results, expectedValues)
+    handleRandomizedTest(results, expectedValues)
   }
 
   if (hasError) {
-    handlePostError(result, expectedValues, context)
+    handleErroneousTest(result, expectedValues, context)
     return
   }
 
-  handlePost(result)
+  handleTest(result)
 }
 
 /* Checks the final result obtained for a test
  * Assumes the test is not erroneous
  */
-function handlePost(result: Result) {
+function handleTest(result: Result) {
   // all non deterministic programs have a final result whose value is undefined
   expect(result.status).toEqual('finished')
   expect((result as Finished).value).toEqual(undefined)
@@ -456,16 +548,16 @@ function handlePost(result: Result) {
 /* Checks the final result obtained for a test
  * Assumes the test is erroneous
  */
-function handlePostError(result: Result, expectedValues: any[], context: Context) {
+function handleErroneousTest(result: Result, expectedValues: any[], context: Context) {
   expect(result.status).toEqual('error')
   const message: string = parseError(context.errors)
   expect(message).toEqual(expectedValues[expectedValues.length - 1])
 }
 
 /* Compares expected and obtained results after a test is run
- * Operates assuming the test involves randomization
+ * Assumes the test involves randomization
  */
-function handlePostRandom(results: any[], expectedValues: any[]) {
+function handleRandomizedTest(results: any[], expectedValues: any[]) {
   results.sort()
   expectedValues.sort()
   expect(results).toEqual(expectedValues)
