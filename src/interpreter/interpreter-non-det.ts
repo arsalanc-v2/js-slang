@@ -453,7 +453,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
-    let value: any // tslint:disable-line
+    let value: Value // tslint:disable-line
     function* loop(): Value {
       const testGenerator = evaluate(node.test, context)
       for (const test of testGenerator) {
