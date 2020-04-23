@@ -423,7 +423,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const valueGenerator = evaluate(node.right, context)
     for (const value of valueGenerator) {
       setVariable(context, id.name, value)
-      yield value 
+      yield value
     }
     return
   },
@@ -454,7 +454,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   WhileStatement: function*(node: es.WhileStatement, context: Context) {
     let value: any // tslint:disable-line
-    function* loop(): any {
+    function* loop(): Value {
       const testGenerator = evaluate(node.test, context)
       for (const test of testGenerator) {
         const error = rttc.checkIfStatement(node.test, test)
