@@ -514,7 +514,7 @@ test('For loops', async () => {
   )
 })
 
-test('For loop should use new environment', async () => {
+test('Let statement should be block scoped in head of for loop', async () => {
   await testDeterministicCode(
     `
     for (let i = 2; i > 0; i = i - 1) {
@@ -523,6 +523,18 @@ test('For loop should use new environment', async () => {
   `,
     'Line -1: Name i not declared.',
     true
+  )
+})
+
+test('Let statement should be block scoped in body of for loop', async () => {
+  await testDeterministicCode(
+    `
+    let x = 0;
+    for (x; x < 10; x = x + 1) {
+      let x = 1;
+    }
+    x;`,
+    10
   )
 
   await testDeterministicCode(
@@ -534,17 +546,6 @@ test('For loop should use new environment', async () => {
   `,
     'Line -1: Name x not declared.',
     true
-  )
-})
-
-test('Let statement should be block scoped in body of for loop', async () => {
-  await testDeterministicCode(
-    `
-    for (let x = 0; x < 10; x = x + 1) {
-      let x = 1;
-    }
-    `,
-    1
   )
 })
 
