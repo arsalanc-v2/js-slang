@@ -469,7 +469,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         ) {
           const environment = createBlockEnvironment(context, 'forBlockEnvironment')
           pushEnvironment(context, environment)
-          
+
           const bodyGenerator = evaluate(cloneDeep(node.body), context)
           for (const body of bodyGenerator) {
             value = body
@@ -488,10 +488,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           } else {
             yield value
           }
-        } 
+        }
       }
     }
-  
+
     // Create a new block scope for the loop variables
     const loopEnvironment = createBlockEnvironment(context, 'forLoopEnvironment')
     pushEnvironment(context, loopEnvironment)
@@ -504,9 +504,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const initNodeGenerator = evaluate(node.init!, context)
     for (const _init of initNodeGenerator) {
       const loopGenerator = loop()
-      for (const value of loopGenerator) {
+      for (const loopValue of loopGenerator) {
         popEnvironment(context)
-        yield value
+        yield loopValue
         pushEnvironment(context, loopEnvironment)
       }
     }
