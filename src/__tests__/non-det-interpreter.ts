@@ -625,7 +625,7 @@ test('Non-deterministic while loop condition', async () => {
 })
 
 test('Non-deterministic while loop body', async () => {
-  /* number of total program values = 
+  /* number of total program values =
     (number of values from cartesian product of the statements in loop body)^
     (number of loop iterations)
   */

@@ -478,7 +478,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           } else {
             yield value
           }
-        } 
+        }
       }
     }
 
