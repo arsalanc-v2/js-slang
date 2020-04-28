@@ -6,7 +6,7 @@
  * If <CODE>n</CODE> is 0, it forces the language processor to backtrack to
  * the most recent <CODE>amb</CODE> expression without returning a value.
  * @param {value} e1,e2,...en - given values
- * @returns {value} a value from the given values (sequentially)
+ * @returns {value} a value from the given values chosen sequentially
  */
 function amb(e1, e2, ...en) {}
 
@@ -18,7 +18,7 @@ function amb(e1, e2, ...en) {}
  * Functions similarly to the <CODE>amb</CODE> operator but makes choices randomly 
  * instead of sequentially.
  * @param {value} e1,e2,...en - given values
- * @returns {value} a value from the given values (randomly)
+ * @returns {value} a value from the given values chosen randomly
  */
 function ambR(e1, e2, ...en) {}
 
