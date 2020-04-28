@@ -474,58 +474,84 @@ test('Material Biconditional', async () => {
 })
 
 test('For loops', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 0;
     for (i; i < 0; i = i + 1) {
     }
     i;
-  `, 0)
+  `,
+    0
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     for (let i = 0; i < 5; i = i + 1) {
       i;
     }
-  `, 4)
+  `,
+    4
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let count = 0;
     for (let i = 5; i > 0; i = i - 2) {
       count = count + 1;
     }
     count;
-  `, 3)
+  `,
+    3
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     for (let i = 0; 2; i = i + 1) {
     }
-  `, 'Line 2: Expected boolean as condition, got number.', true)
+  `,
+    'Line 2: Expected boolean as condition, got number.',
+    true
+  )
 })
 
 test('For loop should use new environment', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     for (let i = 2; i > 0; i = i - 1) {
     }
     i;
-  `, 'Line -1: Name i not declared.', true)
+  `,
+    'Line -1: Name i not declared.',
+    true
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     for (let i = 2; i > 0; i = i - 1) {
       let x = 5;
     }
     x;
-  `, 'Line -1: Name x not declared.', true)
+  `,
+    'Line -1: Name x not declared.',
+    true
+  )
 })
 
 test('Assignment to loop control variable should be disallowed', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     for (let i=0; i < 2; i = i + 1){
       i = i + 1;
     }
-  `, 'Line 3: Assignment to a for loop variable in the for loop is not allowed.', true)
+  `,
+    'Line 3: Assignment to a for loop variable in the for loop is not allowed.',
+    true
+  )
 })
 
 test('Nested for loops', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let count = 0;
     for (let i = 0; i < 1; i = i + 1) {
       for (let j = 0; j < 2; j = j + 1) {
@@ -535,31 +561,40 @@ test('Nested for loops', async () => {
       }
     }
     count;
-  `, 8)
+  `,
+    8
+  )
 })
 
-test('Break statement in while loop body',  async () => {
-  await testDeterministicCode(`
+test('Break statement in while loop body', async () => {
+  await testDeterministicCode(
+    `
     let count = 0;
     for (let i = 0; i < 5; i = i + 1) {
       break;
       count = count + 1;
     }
-    count;`, 0)
+    count;`,
+    0
+  )
 })
 
 test('Continue statement in while loop body', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let count = 0;
     for (let i = 0; i < 5; i = i + 1) {
       continue;
       count = count + 1;
     }
-    count;`, 0)
+    count;`,
+    0
+  )
 })
 
 test('Return statement in while loop body', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let count = 0;
     function loopTest(x) {
       for (let i = 0; i < 5; i = i + 1) {
@@ -567,34 +602,45 @@ test('Return statement in while loop body', async () => {
         count = count + 1;
       }
     }
-    loopTest(10);`, 10)
+    loopTest(10);`,
+    10
+  )
 })
 
 test('Non-deterministic for loop initializer', async () => {
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let j = 0;
     for (let i = amb(3, 4); i > 0; i = i - 1) {
       j = j + 1;
     }
-    j;`, [3, 4])
+    j;`,
+    [3, 4]
+  )
 })
 
 test('Non-deterministic for loop condition', async () => {
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let count = 0;
     for (let i = 2; i > amb(0, 1); i = i - 1) {
       count = count + 1;
     }
-    count;`, [2, 2, 1, 2, 2, 1]) // chosen conditions: (0, 0, 0), (0, 0, 1), (0, 1), (1, 0, 0), (1, 0, 1), (1, 1)
+    count;`,
+    [2, 2, 1, 2, 2, 1]
+  ) // chosen conditions: (0, 0, 0), (0, 0, 1), (0, 1), (1, 0, 0), (1, 0, 1), (1, 1)
 })
 
 test('Non-deterministic for loop update', async () => {
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let count = 0;
     for (let i = 2; i > 0; i = i - amb(1, 2)) {
       count = count + 1;
     }
-    count;`, [2, 2, 1]) // chosen updates: (1, 1), (1, 2), (2)
+    count;`,
+    [2, 2, 1]
+  ) // chosen updates: (1, 1), (1, 2), (2)
 })
 
 test('Non-deterministic for loop body', async () => {
@@ -603,20 +649,26 @@ test('Non-deterministic for loop body', async () => {
     (number of loop iterations)
   */
 
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let count = 0;
     for (let i = 3; i > 0; i = i - 1) {
       count = count + amb(0, 1);
     }
-    count;`, [0, 1, 1, 2, 1, 2, 2, 3])
+    count;`,
+    [0, 1, 1, 2, 1, 2, 2, 3]
+  )
 
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let count = 0;
     for (let i = 2; i > 0; i = i - 1) {
       count = count + amb(0, 1);
       count = count + amb(0, 1);
     }
-    count;`, [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4])
+    count;`,
+    [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4]
+  )
 })
 // ---------------------------------- Helper functions  -------------------------------------------
 
