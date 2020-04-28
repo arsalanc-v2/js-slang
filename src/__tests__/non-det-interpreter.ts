@@ -549,6 +549,18 @@ test('Let statement should be block scoped in body of for loop', async () => {
   )
 })
 
+test('Loop control variable should be copied into for loop body', async () => {
+  await testDeterministicCode(
+    `
+    let arr = [];
+    for (let i = 0; i < 5; i = i + 1) {
+      arr[i] = () => i;
+    }
+    arr[3]();`,
+    3
+  )
+})
+
 test('Assignment to loop control variable', async () => {
   await testDeterministicCode(
     `

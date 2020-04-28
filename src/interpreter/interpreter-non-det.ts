@@ -469,6 +469,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         ) {
           const environment = createBlockEnvironment(context, 'forBlockEnvironment')
           pushEnvironment(context, environment)
+          for (const name in loopEnvironment.head) {
+            if (loopEnvironment.head.hasOwnProperty(name)) {
+              declareIdentifier(context, name, node)
+              defineVariable(context, name, loopEnvironment.head[name], true)
+            }
+          }
 
           const bodyGenerator = evaluate(cloneDeep(node.body), context)
           for (const body of bodyGenerator) {
