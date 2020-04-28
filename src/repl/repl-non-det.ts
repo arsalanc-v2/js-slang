@@ -30,7 +30,7 @@ function _try_again_message(): string | undefined {
   if (previousInput) {
     const message: string = NO_MORE_VALUES_MESSAGE + previousInput
     previousInput = undefined
-    
+
     return message
   } else {
     return undefined
