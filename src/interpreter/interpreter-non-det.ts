@@ -11,7 +11,6 @@ import Closure from './closure'
 import { cloneDeep, assignIn } from 'lodash'
 import { CUT } from '../constants'
 
-
 class BreakValue {}
 
 class ContinueValue {}
@@ -258,7 +257,11 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
       // prevent unshifting of cut operator
       shouldUnshift = sequenceValue !== CUT
 
-      if (sequenceValue instanceof ReturnValue || sequenceValue instanceof BreakValue || sequenceValue instanceof ContinueValue) {
+      if (
+        sequenceValue instanceof ReturnValue ||
+        sequenceValue instanceof BreakValue ||
+        sequenceValue instanceof ContinueValue
+      ) {
         yield sequenceValue
         continue
       }

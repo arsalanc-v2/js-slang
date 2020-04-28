@@ -474,47 +474,65 @@ test('Material Biconditional', async () => {
 })
 
 test('While loops', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 2;
     while (false) {
       i = i - 1;
     }
-    i;`, 2)
+    i;`,
+    2
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 5;
     while (i > 0) {
       i = i - 1;
-    }`, 0)
+    }`,
+    0
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 5;
     let j = 0;
     while (i > 0 && j < 5) {
       i = i - 1;
       j = j + 2;
-    }`, 6)
+    }`,
+    6
+  )
 
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 2;
     while (i) {
       i = i - 1;
     }
-    i;`, 'Line 3: Expected boolean as condition, got number.', true)
+    i;`,
+    'Line 3: Expected boolean as condition, got number.',
+    true
+  )
 })
 
 test('While loop body should use new environment', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 2;
     while (i > 0) {
       i = i - 1;
       let x = 5;
     }
-    x;`, 'Line -1: Name x not declared.', true)
+    x;`,
+    'Line -1: Name x not declared.',
+    true
+  )
 })
 
 test('Nested while loops', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let count = 0;
     let i = 1;
     while (i > 0) {
@@ -529,21 +547,27 @@ test('Nested while loops', async () => {
       }
       i = i - 1;
     }
-    count;`, 8)
+    count;`,
+    8
+  )
 })
 
-test('Break statement in while loop body',  async () => {
-  await testDeterministicCode(`
+test('Break statement in while loop body', async () => {
+  await testDeterministicCode(
+    `
     let i = 5;
     while (i > 0) {
       i = i - 1;
       break;
     }
-    i;`, 4)
+    i;`,
+    4
+  )
 })
 
 test('Continue statement in while loop body', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     let i = 5;
     let j = 0;
     while (i > 0 && j < 5) {
@@ -551,11 +575,14 @@ test('Continue statement in while loop body', async () => {
       continue;
       j = j + 2;
     }
-    j;`, 0)
+    j;`,
+    0
+  )
 })
 
 test('Return statement in while loop body', async () => {
-  await testDeterministicCode(`
+  await testDeterministicCode(
+    `
     function loopTest(i, j) {
       while (i > 0 && j > i) {
         return i * j;
@@ -563,20 +590,26 @@ test('Return statement in while loop body', async () => {
         j = j + i;
       }
     }
-    loopTest(5, 10);`, 50)
+    loopTest(5, 10);`,
+    50
+  )
 })
 
 test('Non-deterministic while loop condition', async () => {
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let i = amb(3, 4);
     let j = 0;
     while (i > 0) {
       i = i - 1;
       j = j + 1;
     }
-    j;`, [3, 4])
-  
-  await testNonDeterministicCode(`
+    j;`,
+    [3, 4]
+  )
+
+  await testNonDeterministicCode(
+    `
     let i = 1;
     let j = 2;
     let count = 0;
@@ -586,7 +619,9 @@ test('Non-deterministic while loop condition', async () => {
 
       count = count + 1;
     }
-    count;`, [1, 2, 2, 1, 2, 2]) // chosen variables: (i,i), (i,j,i), (i,j,j), (j,i), (j,j,i), (j,j,j)
+    count;`,
+    [1, 2, 2, 1, 2, 2]
+  ) // chosen variables: (i,i), (i,j,i), (i,j,j), (j,i), (j,j,i), (j,j,j)
 })
 
 test('Non-deterministic while loop body', async () => {
@@ -595,16 +630,20 @@ test('Non-deterministic while loop body', async () => {
     (number of loop iterations)
   */
 
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let i = 3;
     let count = 0;
     while (i > 0) {
       count = count + amb(0, 1);
       i = i - 1;
     }
-    count;`, [0, 1, 1, 2, 1, 2, 2, 3])
+    count;`,
+    [0, 1, 1, 2, 1, 2, 2, 3]
+  )
 
-  await testNonDeterministicCode(`
+  await testNonDeterministicCode(
+    `
     let i = 2;
     let count = 0;
     while (i > 0) {
@@ -613,7 +652,9 @@ test('Non-deterministic while loop body', async () => {
 
       i = i - 1;
     }
-    count;`, [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4])
+    count;`,
+    [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4]
+  )
 })
 // ---------------------------------- Helper functions  -------------------------------------------
 
