@@ -537,6 +537,17 @@ test('For loop should use new environment', async () => {
   )
 })
 
+test('Let statement should be block scoped in body of for loop', async () => {
+  await testDeterministicCode(
+    `
+    for (let x = 0; x < 10; x = x + 1) {
+      let x = 1;
+    }
+    `,
+    1
+  )
+})
+
 test('Assignment to loop control variable should be disallowed', async () => {
   await testDeterministicCode(
     `
