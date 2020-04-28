@@ -452,17 +452,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ForStatement: function*(node: es.ForStatement, context: Context) {
-    function addBodyEnv() {
-      const environment = createBlockEnvironment(context, 'forBlockEnvironment')
-      pushEnvironment(context, environment)
-      for (const name in loopEnvironment.head) {
-        if (loopEnvironment.head.hasOwnProperty(name)) {
-          declareIdentifier(context, name, node)
-          defineVariable(context, name, loopEnvironment.head[name], true)
-        }
-      }
-    }
-
     let value: Value
     function* loop(): Value {
       const testGenerator = evaluate(node.test!, context)
@@ -474,7 +463,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           !(value instanceof ReturnValue) &&
           !(value instanceof BreakValue)
         ) {
-          addBodyEnv()
+          const environment = createBlockEnvironment(context, 'forBlockEnvironment')
+          pushEnvironment(context, environment)
           
           const bodyGenerator = evaluate(cloneDeep(node.body), context)
           for (const body of bodyGenerator) {
@@ -482,11 +472,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             popEnvironment(context)
             const updateNode = evaluate(node.update!, context)
             for (const _update of updateNode) {
-              // Remove block context
               yield* loop();
             }
 
-            addBodyEnv()
+            pushEnvironment(context, environment)
           }
           popEnvironment(context)
         } else {
@@ -510,8 +499,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     const initNodeGenerator = evaluate(node.init!, context)
     for (const _init of initNodeGenerator) {
-      const valueGenerator = loop()
-      for (const value of valueGenerator) {
+      const loopGenerator = loop()
+      for (const value of loopGenerator) {
         popEnvironment(context)
         yield value
         pushEnvironment(context, loopEnvironment)
