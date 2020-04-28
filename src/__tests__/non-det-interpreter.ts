@@ -516,7 +516,19 @@ test('While loops', async () => {
   )
 })
 
-test('While loop body should use new environment', async () => {
+test('Let statement should be block scoped in body of while loop', async () => {
+  await testDeterministicCode(
+    `
+    let i = 2;
+    let x = 5;
+    while (i > 0) {
+      i = i - 1;
+      let x = 10;
+    }
+    x;`,
+    5
+  )
+
   await testDeterministicCode(
     `
     let i = 2;
