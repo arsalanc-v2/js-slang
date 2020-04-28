@@ -548,15 +548,25 @@ test('Let statement should be block scoped in body of for loop', async () => {
   )
 })
 
-test('Assignment to loop control variable should be disallowed', async () => {
+test('Assignment to loop control variable', async () => {
   await testDeterministicCode(
     `
-    for (let i=0; i < 2; i = i + 1){
+    for (let i = 0; i < 2; i = i + 1){
       i = i + 1;
     }
   `,
     'Line 3: Assignment to a for loop variable in the for loop is not allowed.',
     true
+  )
+
+  await testDeterministicCode(
+    `
+    let i = 0;
+    for (i; i < 2; i = i + 1){
+      i = i + 1;
+    }
+  i;`,
+    2
   )
 })
 
