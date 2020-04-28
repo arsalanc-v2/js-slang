@@ -339,7 +339,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           return yield* getAmbArgs(context, node)
         case 'ambR':
           return yield* getAmbRArgs(context, node)
-        case 'cut': 
+        case 'cut':
           return yield CUT
       }
     }
