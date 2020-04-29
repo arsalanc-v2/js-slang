@@ -525,30 +525,29 @@ export async function testNonDeterministicCode(
   }
 
   if (random) {
-    handleRandomizedTest(results, expectedValues)
+    verifyRandomizedTest(results, expectedValues)
   }
 
   if (hasError) {
-    handleErroneousTest(result, expectedValues, context)
-    return
+    verifyError(result, expectedValues, context)
+  } else {
+    verifyFinalResult(result)
   }
-
-  handleTest(result)
 }
 
 /* Checks the final result obtained for a test
  * Assumes the test is not erroneous
  */
-function handleTest(result: Result) {
+function verifyFinalResult(result: Result) {
   // all non deterministic programs have a final result whose value is undefined
   expect(result.status).toEqual('finished')
   expect((result as Finished).value).toEqual(undefined)
 }
 
-/* Checks the final result obtained for a test
- * Assumes the test is erroneous
+/* Checks the error obtained for an erroneous test
+ * The error message is captured as the test's final result
  */
-function handleErroneousTest(result: Result, expectedValues: any[], context: Context) {
+function verifyError(result: Result, expectedValues: any[], context: Context) {
   expect(result.status).toEqual('error')
   const message: string = parseError(context.errors)
   expect(message).toEqual(expectedValues[expectedValues.length - 1])
@@ -557,7 +556,7 @@ function handleErroneousTest(result: Result, expectedValues: any[], context: Con
 /* Compares expected and obtained results after a test is run
  * Assumes the test involves randomization
  */
-function handleRandomizedTest(results: any[], expectedValues: any[]) {
+function verifyRandomizedTest(results: any[], expectedValues: any[]) {
   results.sort()
   expectedValues.sort()
   expect(results).toEqual(expectedValues)
