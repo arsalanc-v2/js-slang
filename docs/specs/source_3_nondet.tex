@@ -20,18 +20,20 @@ A Source \S 3 Non-Det program can contain any number of choice points. Evaluatin
 
 In the Source Academy implementation, the Source \S 3 Non-Det evaluator can only process one program at a time. If the evaluator is given a new program \textbf{before} all the outcomes of an existing program have been processed, then all remaining outcomes will be ignored. \newline
 
-Unlike Source \S 3, Source \S 3 Non-Det currently does not support loops.
+Unlike Source \S 3, loops in Source \S 3 Non-Det do not use constant memory. Memory usage increases linearly with the number of iterations. <- TODO: CHECK IF THIS IS TRUE
 
 
 \input source_bnf.tex
 
 \newpage
 
-\input source_3_bnf.tex
+\input source_3_nondet_bnf.tex
 
 \newpage
 
 \input source_boolean_operators
+
+\input source_loops
 
 \input source_return_3
 
