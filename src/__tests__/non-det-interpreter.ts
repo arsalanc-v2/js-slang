@@ -380,7 +380,7 @@ test('Block statements', async () => {
   )
 })
 
-test('Test ambR application', async () => {
+test('ambR application', async () => {
   await testNonDeterministicCode('ambR();', [], false, true)
 
   await testNonDeterministicCode('ambR(1, 2, 3, 4, 5);', [1, 2, 3, 4, 5], false, true)
