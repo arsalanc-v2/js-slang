@@ -600,7 +600,7 @@ test('Nested for loops', async () => {
   )
 })
 
-test('Break statement in while loop body', async () => {
+test('Break statement in for loop body', async () => {
   await testDeterministicCode(
     `
     let count = 0;
@@ -613,7 +613,7 @@ test('Break statement in while loop body', async () => {
   )
 })
 
-test('Continue statement in while loop body', async () => {
+test('Continue statement in for loop body', async () => {
   await testDeterministicCode(
     `
     let count = 0;
@@ -626,7 +626,7 @@ test('Continue statement in while loop body', async () => {
   )
 })
 
-test('Return statement in while loop body', async () => {
+test('Return statement in for loop body', async () => {
   await testDeterministicCode(
     `
     let count = 0;
