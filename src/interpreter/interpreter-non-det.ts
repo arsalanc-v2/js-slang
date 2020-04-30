@@ -179,6 +179,26 @@ const checkNumberOfArguments = (
   return undefined
 }
 
+/**
+ * Returns a random integer for a given interval (inclusive).
+ */
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
+function* getAmbRArgs(context: Context, call: es.CallExpression) {
+  const originalContext = cloneDeep(context)
+
+  const args: es.Node[] = cloneDeep(call.arguments)
+  while (args.length > 0) {
+    const r = randomInt(0, args.length - 1)
+    const arg: es.Node = args.splice(r, 1)[0]
+
+    yield* evaluate(arg, context)
+    assignIn(context, cloneDeep(originalContext))
+  }
+}
+
 function* getArgs(context: Context, call: es.CallExpression) {
   const args = cloneDeep(call.arguments)
   return yield* cartesianProduct(context, args as es.Expression[], [])
@@ -322,10 +342,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   CallExpression: function*(node: es.CallExpression, context: Context) {
     const callee = node.callee;
     if (rttc.isIdentifier(callee)) {
-      if (callee.name === 'amb') {
-        return yield* getAmbArgs(context, node)
-      } else if (callee.name === 'cut') {
-        return yield CUT
+      switch (callee.name) {
+        case 'amb':
+          return yield* getAmbArgs(context, node)
+        case 'ambR':
+          return yield* getAmbRArgs(context, node)
+        case 'cut':
+          return yield CUT
       }
     }
 
@@ -453,6 +476,36 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   BreakStatement: function*(node: es.BreakStatement, context: Context) {
     yield new BreakValue()
+  },
+
+  WhileStatement: function*(node: es.WhileStatement, context: Context) {
+    let value: Value // tslint:disable-line
+    function* loop(): Value {
+      const testGenerator = evaluate(node.test, context)
+      for (const test of testGenerator) {
+        const error = rttc.checkIfStatement(node.test, test)
+        if (error) return handleRuntimeError(context, error)
+
+        if (test &&
+          !(value instanceof ReturnValue) &&
+          !(value instanceof BreakValue)
+        ) {
+          const iterationValueGenerator = evaluate(cloneDeep(node.body), context)
+          for (const iterationValue of iterationValueGenerator) {
+            value = iterationValue
+            yield* loop();
+          }
+        } else {
+          if (value instanceof BreakValue || value instanceof ContinueValue) {
+            yield undefined
+          } else {
+            yield value
+          }
+        }
+      }
+    }
+
+    yield* loop();
   },
 
   ForStatement: function*(node: es.ForStatement, context: Context) {
