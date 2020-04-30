@@ -467,9 +467,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           !(value instanceof ReturnValue) &&
           !(value instanceof BreakValue)
         ) {
-          const bodyGenerator = evaluate(cloneDeep(node.body), context)
-          for (const body of bodyGenerator) {
-            value = body
+          const iterationValueGenerator = evaluate(cloneDeep(node.body), context)
+          for (const iterationValue of iterationValueGenerator) {
+            value = iterationValue
             yield* loop();
           }
         } else {
