@@ -520,8 +520,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           !(value instanceof ReturnValue) &&
           !(value instanceof BreakValue)
         ) {
-          const environment = createBlockEnvironment(context, 'forBlockEnvironment')
-          pushEnvironment(context, environment)
+          const iterationEnvironment = createBlockEnvironment(context, 'forBlockEnvironment')
+          pushEnvironment(context, iterationEnvironment)
           for (const name in loopEnvironment.head) {
             if (loopEnvironment.head.hasOwnProperty(name)) {
               declareIdentifier(context, name, node)
@@ -529,16 +529,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             }
           }
 
-          const bodyGenerator = evaluate(cloneDeep(node.body), context)
-          for (const body of bodyGenerator) {
-            value = body
+          const iterationValueGenerator = evaluate(cloneDeep(node.body), context)
+          for (const iterationValue of iterationValueGenerator) {
+            value = iterationValue
             popEnvironment(context)
             const updateNode = evaluate(node.update!, context)
             for (const _update of updateNode) {
               yield* loop();
             }
 
-            pushEnvironment(context, environment)
+            pushEnvironment(context, iterationEnvironment)
           }
           popEnvironment(context)
         } else {
