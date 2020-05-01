@@ -288,7 +288,7 @@ function* evaluateSequence(context: Context, sequence: es.Statement[]): Iterable
 
       const res = yield* evaluateSequence(context, sequence)
       if (res === CUT) {
-        // prevent unshifting of statenents before cut
+        // prevent unshifting of statements before cut
         shouldUnshift = false
         break
       }
